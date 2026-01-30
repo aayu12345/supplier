@@ -38,7 +38,7 @@ export default function RegisterPage() {
         formData.append("role", role);
 
         const { signup } = await import("../actions");
-        const result = await signup(formData);
+        const result = await signup(formData) as { error?: string, success?: string };
 
         if (result?.error) {
             alert(result.error);
