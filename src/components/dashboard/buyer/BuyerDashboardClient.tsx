@@ -21,12 +21,11 @@ export default function BuyerDashboardClient({ userName, isLoggedIn, shouldOpenM
         <div className="min-h-screen bg-white p-4 md:p-8">
             <div className="max-w-7xl mx-auto">
                 {/* Pass onUploadClick to Header */}
-                <div className="mb-8">
+                <div className="mb-8 block">
                     <HeaderWrapper userName={userName} onUploadClick={() => setIsModalOpen(true)} isLoggedIn={isLoggedIn} />
                 </div>
 
-                {/* Pass onUploadClick to Hero */}
-                <HeroWrapper onUploadClick={() => setIsModalOpen(true)} />
+                {/* HeroBanner Removed as per user request */}
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Main Content Area */}

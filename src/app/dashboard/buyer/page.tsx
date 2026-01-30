@@ -10,11 +10,9 @@ export default async function BuyerDashboard(props: Props) {
     const searchParams = await props.searchParams;
     const soup = await createClient();
 
-    console.time('Page getUser');
     const {
         data: { user },
     } = await soup.auth.getUser();
-    console.timeEnd('Page getUser');
 
     // Fetch profile for name, default to email username if name not found in metadata
     const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "Guest";

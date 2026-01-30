@@ -33,9 +33,7 @@ export async function middleware(request: NextRequest) {
         }
     );
 
-    console.time('Middleware User Check');
     await supabase.auth.getUser();
-    console.timeEnd('Middleware User Check');
 
     return response;
 }

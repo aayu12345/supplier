@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function submitRFQ(formData: FormData) {
-    const supabase = await createClient();
+    const supabase = await createClient(); // Keep for reading current user if exists
+
+    // Use Admin Client for ALL write operations to avoid RLS/Session race conditions
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const supabaseAdmin = createAdminClient();
 
     // 1. Auth Check - Get current user
     const {
@@ -15,27 +19,7 @@ export async function submitRFQ(formData: FormData) {
     let userId = user?.id;
     let userEmail = user?.email;
 
-    // 2. Prepare File Upload (Start early)
-    const file = formData.get("file") as File;
-    if (!file) {
-        return { error: "No file uploaded." };
-    }
-
-    const rfqNumber = `RFQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${rfqNumber}_${Date.now()}.${fileExt}`;
-    // Use a temporary path or 'guest' if userId is not known yet. 
-    // We will use 'guest' prefix for anonymous uploads to allow parallelization.
-    // If we want to move it later we can, but 'guest' folder is fine for now.
-    const filePath = `${userId || 'guest'}/${fileName}`;
-
-    const uploadPromise = supabase.storage
-        .from("rfq-drawings")
-        .upload(filePath, file);
-
-    // 3. Handle Guest Auth (Parallel with Upload)
-    let authPromise = Promise.resolve(); // Default resolved
-
+    // 2. Handle Guest Logic
     if (!userId) {
         const email = formData.get("contact_email") as string;
         const phone = formData.get("contact_phone") as string;
@@ -46,61 +30,58 @@ export async function submitRFQ(formData: FormData) {
         }
         userEmail = email;
 
-        // Wrap auth logic in a promise function
-        authPromise = (async () => {
-            const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
+        const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
 
-            // Use Admin Client for verified creation
-            const { createAdminClient } = await import("@/lib/supabase/admin");
-            const supabaseAdmin = createAdminClient();
+        // Check availability or Create User
+        const { data: newUser, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password: tempPassword,
+            email_confirm: true,
+            user_metadata: { full_name: name, phone: phone, role: 'buyer' }
+        });
 
-            const { data: newUser, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
+        if (newUser.user) {
+            userId = newUser.user.id;
+            console.log(`[AUTO-REGISTER] Created new verified user ${userId}`);
+
+            // Attempt to sign them in for the frontend session
+            // Note: This sets cookies for the RESPONSE, but won't affect the current running function's "supabase" client
+            await supabase.auth.signInWithPassword({
                 email,
                 password: tempPassword,
-                email_confirm: true,
-                user_metadata: { full_name: name, phone: phone, role: 'buyer' }
             });
-
-            if (newUser.user) {
-                userId = newUser.user.id;
-                console.log(`[AUTO-REGISTER] Created new verified user ${userId} for ${email}`);
-
-                // Auto-Login
-                const { error: signInError } = await supabase.auth.signInWithPassword({
-                    email,
-                    password: tempPassword,
-                });
-
-                if (signInError) {
-                    console.error("Auto-login failed:", signInError.message);
-                } else {
-                    console.log("[AUTO-REGISTER] Auto-login successful.");
-                }
-
-            } else {
-                // If it fails (e.g. user already exists), we just log it and proceed without linking
-                // or we could try to sign in if we knew the password (which we don't for existing users).
-                console.log("[AUTO-REGISTER] User might exist or could not be created:", signUpError?.message);
-            }
-        })();
+        } else {
+            console.log("[AUTO-REGISTER] Note:", signUpError?.message);
+            // If user exists, we try to use their email to find ID if possible, or proceed as anonymous for now?
+            // For Security, if user exists but isn't logged in, we shouldn't link data blindly.
+            // But for this MVP, if create fails, we might just proceed with userId = null (or guest)
+        }
     }
 
-    // 4. Wait for both Key Tasks
-    const [uploadResult] = await Promise.all([uploadPromise, authPromise]);
+    // 3. Prepare File Upload 
+    const file = formData.get("file") as File;
+    if (!file) return { error: "No file uploaded." };
 
-    if (uploadResult.error) {
-        console.error("Upload Error:", uploadResult.error);
+    const rfqNumber = `RFQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${rfqNumber}_${Date.now()}.${fileExt}`;
+    const filePath = `${userId || 'guest'}/${fileName}`;
+
+    // Upload using ADMIN client to bypass any "authenticated only" RLS issues if we are fresh
+    const { error: uploadError } = await supabaseAdmin.storage
+        .from("rfq-drawings")
+        .upload(filePath, file);
+
+    if (uploadError) {
+        console.error("Upload Error:", uploadError);
         return { error: "Failed to upload file." };
     }
 
-    // Get Public URL
-    const { data: { publicUrl } } = supabase.storage
-        .from("rfq-drawings")
-        .getPublicUrl(filePath);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from("rfq-drawings").getPublicUrl(filePath);
 
-    // 5. Insert RFQ Record (Must happen after Auth to get userId potentially)
-    const { error: dbError } = await supabase.from("rfqs").insert({
-        user_id: userId || null, // Updated by authPromise if successful
+    // 4. Insert RFQ Record (Using Admin to ensure Insert RLS doesn't block)
+    const { error: dbError } = await supabaseAdmin.from("rfqs").insert({
+        user_id: userId || null,
         rfq_number: rfqNumber,
         status: "Pending",
         file_url: publicUrl,
@@ -120,13 +101,6 @@ export async function submitRFQ(formData: FormData) {
         console.error("DB Error:", dbError);
         return { error: "Failed to save RFQ details." };
     }
-
-    // 6. Trigger Notifications (Mock)
-    console.log(`[EMAIL TRIGGER] Sending RFQ Received Email to: ${userEmail}`);
-    if (!userId) {
-        console.log(`[EMAIL TRIGGER] Sending Welcome Email to New Buyer: ${userEmail}`);
-    }
-    console.log(`[EMAIL TRIGGER] Sending New RFQ Alert ${rfqNumber} to Admin`);
 
     revalidatePath("/dashboard/buyer");
     return { success: `Request ${rfqNumber} submitted successfully!` };
