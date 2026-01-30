@@ -110,8 +110,17 @@ export default function QuotesTable() {
             {/* Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-h-[300px]">
                 {loading ? (
-                    <div className="flex items-center justify-center h-48 text-gray-400">
-                        Loading requests...
+                    <div className="animate-pulse">
+                        <div className="h-10 bg-gray-100 border-b border-gray-200" />
+                        {[...Array(5)].map((_, i) => (
+                            <div key={i} className="flex items-center px-6 py-4 border-b border-gray-100">
+                                <div className="h-4 bg-gray-200 rounded w-24 mr-6" />
+                                <div className="h-4 bg-gray-200 rounded w-32 mr-6" />
+                                <div className="h-4 bg-gray-200 rounded w-16 mr-6" />
+                                <div className="h-4 bg-gray-200 rounded w-24 mr-auto" />
+                                <div className="h-6 bg-gray-200 rounded w-20" />
+                            </div>
+                        ))}
                     </div>
                 ) : (
                     <div className="overflow-x-auto">

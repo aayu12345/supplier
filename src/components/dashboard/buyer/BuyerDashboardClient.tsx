@@ -3,8 +3,7 @@
 import { useState } from "react";
 import DashboardHeader from "@/components/dashboard/buyer/DashboardHeader";
 import HeroBanner from "@/components/dashboard/buyer/HeroBanner";
-import DashboardTabs from "@/components/dashboard/buyer/DashboardTabs";
-import RFQSection from "@/components/dashboard/buyer/RFQSection";
+import QuotesTable from "@/components/dashboard/buyer/quotes/QuotesTable";
 import RecentActivity from "@/components/dashboard/buyer/RecentActivity";
 import RFQUploadModal from "@/components/dashboard/buyer/RFQUploadModal";
 
@@ -30,8 +29,11 @@ export default function BuyerDashboardClient({ userName, isLoggedIn, shouldOpenM
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Main Content Area */}
                     <div className="lg:col-span-2">
-                        <DashboardTabs />
-                        <RFQSection />
+                        <div className="mb-6">
+                            <h2 className="text-xl font-bold text-gray-900">Your Quotes</h2>
+                        </div>
+                        {/* We use QuotesTable directly as it has built-in tabs and data fetching */}
+                        <QuotesTable />
                     </div>
 
                     {/* Sidebar */}

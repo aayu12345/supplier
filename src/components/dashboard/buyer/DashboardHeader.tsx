@@ -1,6 +1,9 @@
-import { Bell, Search, Upload, LogOut, LogIn } from "lucide-react";
+"use client";
+
+import { Bell, Search, Upload, LogOut, LogIn, User, Settings, ChevronDown } from "lucide-react";
 import { signOut } from "@/app/auth/actions";
 import Link from "next/link";
+import { useState } from "react";
 
 interface DashboardHeaderProps {
     userName: string;
@@ -9,6 +12,8 @@ interface DashboardHeaderProps {
 }
 
 export default function DashboardHeader({ userName, onUploadClick, isLoggedIn = true }: DashboardHeaderProps) {
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+
     return (
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <div>
@@ -28,22 +33,55 @@ export default function DashboardHeader({ userName, onUploadClick, isLoggedIn = 
                     />
                 </div>
 
-                <button className="p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors relative">
-                    <Bell className="h-6 w-6" />
-                    <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* Notifications */}
+                    <button className="p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors relative">
+                        <Bell className="h-6 w-6" />
+                        <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                    </button>
 
-                {isLoggedIn ? (
-                    <form action={signOut}>
-                        <button type="submit" className="p-2.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Log Out">
-                            <LogOut className="h-6 w-6" />
-                        </button>
-                    </form>
-                ) : (
-                    <Link href="/auth/login" className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Log In">
-                        <LogIn className="h-6 w-6" />
-                    </Link>
-                )}
+                    {/* Profile Dropdown */}
+                    {isLoggedIn ? (
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                className="flex items-center gap-2 p-1.5 hover:bg-gray-100 rounded-full transition-colors border border-transparent hover:border-gray-200"
+                            >
+                                <div className="h-9 w-9 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center font-bold">
+                                    {userName.charAt(0).toUpperCase()}
+                                </div>
+                                <ChevronDown className="h-4 w-4 text-gray-400" />
+                            </button>
+
+                            {isProfileOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 animate-in fade-in slide-in-from-top-2">
+                                    <div className="px-4 py-2 border-b border-gray-100">
+                                        <p className="text-sm font-bold text-gray-900 truncate">{userName}</p>
+                                        <p className="text-xs text-gray-500">Buyer Account</p>
+                                    </div>
+                                    <Link
+                                        href="/dashboard/buyer/settings"
+                                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        <Settings className="h-4 w-4" />
+                                        Account Settings
+                                    </Link>
+                                    <div className="h-px bg-gray-100 my-1"></div>
+                                    <form action={signOut}>
+                                        <button type="submit" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                            <LogOut className="h-4 w-4" />
+                                            Sign Out
+                                        </button>
+                                    </form>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <Link href="/auth/login" className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Log In">
+                            <LogIn className="h-6 w-6" />
+                        </Link>
+                    )}
+                </div>
 
                 <button
                     onClick={onUploadClick}
