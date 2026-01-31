@@ -38,7 +38,11 @@ export default function QuotesTable() {
         try {
             setLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (!user) {
+                setRfqs([]);
+                setLoading(false);
+                return;
+            }
 
             const { data, error } = await supabase
                 .from("rfqs")

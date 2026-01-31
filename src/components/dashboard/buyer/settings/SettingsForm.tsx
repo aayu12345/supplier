@@ -219,17 +219,17 @@ export default function SettingsForm({ initialData, userEmail }: { initialData: 
                 </div>
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                        <input type="password" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Current Password (optional)</label>
+                        <input name="current_password" type="password" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
                     </div>
                     <div></div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                        <input type="password" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <input name="new_password" type="password" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                        <input type="password" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <input name="confirm_password" type="password" className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
                     </div>
                 </div>
             </section>

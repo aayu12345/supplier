@@ -33,7 +33,7 @@ export default function BuyerDashboardClient({ userName, isLoggedIn, shouldOpenM
                             <h2 className="text-xl font-bold text-gray-900">Your Quotes</h2>
                         </div>
                         {/* We use QuotesTable directly as it has built-in tabs and data fetching */}
-                        <QuotesTable />
+                        <QuotesTable key={`${userName}-${isLoggedIn}`} />
                     </div>
 
                     {/* Sidebar */}

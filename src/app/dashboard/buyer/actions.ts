@@ -49,14 +49,15 @@ export async function submitRFQ(formData: FormData) {
 
             if (!email || !name || !phone) throw new Error("Name, Email and Phone are required for new partners.");
 
-            const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
+            // User requested to use Phone Number as the initial password
+            const tempPassword = phone;
 
             // Allow admin to create user without checking session
             const { data: newUser, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
                 email,
                 password: tempPassword,
                 email_confirm: true,
-                user_metadata: { full_name: name, phone: phone, role: 'buyer' }
+                user_metadata: { name: name, phone: phone, role: 'buyer' }
             });
 
             if (newUser.user) {
@@ -65,7 +66,11 @@ export async function submitRFQ(formData: FormData) {
                     await supabase.auth.signInWithPassword({ email, password: tempPassword });
                 } catch (e) { console.warn("Auto-login failed", e); }
 
-                return { userId: newUser.user.id, email: newUser.user.email };
+                return {
+                    userId: newUser.user.id,
+                    email: newUser.user.email,
+                    newAccount: { email, password: tempPassword }
+                };
             } else if (signUpError?.message?.includes("already registered")) {
                 console.log("User already exists, proceeding as unlinked RFQ");
                 return { userId: null, email };
@@ -100,7 +105,10 @@ export async function submitRFQ(formData: FormData) {
 
         revalidatePath("/dashboard/buyer");
         console.timeEnd("submitRFQ_Total");
-        return { success: `Request ${rfqNumber} submitted successfully!` };
+        return {
+            success: `Request ${rfqNumber} submitted successfully!`,
+            newAccount: userData.newAccount
+        };
 
     } catch (e: any) {
         console.error("Unexpected Error in submitRFQ:", e);

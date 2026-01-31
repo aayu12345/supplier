@@ -35,6 +35,27 @@ export async function updateProfile(formData: FormData) {
         updated_at: new Date().toISOString()
     };
 
+    // Password Update Logic
+    const newPassword = formData.get("new_password") as string;
+    const confirmPassword = formData.get("confirm_password") as string;
+
+    if (newPassword || confirmPassword) {
+        if (newPassword !== confirmPassword) {
+            return { error: "New passwords do not match." };
+        }
+        if (newPassword.length < 6) {
+            return { error: "Password must be at least 6 characters." };
+        }
+
+        const { error: passwordError } = await supabase.auth.updateUser({
+            password: newPassword
+        });
+
+        if (passwordError) {
+            return { error: "Failed to update password: " + passwordError.message };
+        }
+    }
+
     const { error } = await supabase
         .from("profiles")
         .update(updates)

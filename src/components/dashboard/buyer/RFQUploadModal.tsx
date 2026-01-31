@@ -42,7 +42,13 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
             if (result?.error) {
                 alert(result.error);
             } else if (result?.success) {
-                alert("Thank you! Your RFQ has been submitted. You can track it from the Quotes section.");
+                if (result.newAccount) {
+                    // Show password for new guest users
+                    alert(`Request Submitted!\n\nIMPORTANT: We created an account for you.\nEmail: ${result.newAccount.email}\nPassword: ${result.newAccount.password} (Your Phone Number)\n\nYou can verify your account and change this password later in Settings.`);
+                } else {
+                    alert("Thank you! Your RFQ has been submitted. You can track it from the Quotes section.");
+                }
+
                 onClose();
                 router.push("/dashboard/buyer/quotes");
             }
