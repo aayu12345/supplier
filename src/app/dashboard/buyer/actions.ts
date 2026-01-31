@@ -5,105 +5,108 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function submitRFQ(formData: FormData) {
-    const supabase = await createClient(); // Keep for reading current user if exists
+    console.time("submitRFQ_Total");
+    try {
+        // 1. Preparation & Metadata (Sync)
+        const file = formData.get("file") as File;
+        if (!file) return { error: "No file uploaded." };
+        if (file.size > 50 * 1024 * 1024) return { error: "File size exceeds 50MB limit." };
 
-    // Use Admin Client for ALL write operations to avoid RLS/Session race conditions
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const supabaseAdmin = createAdminClient();
+        const rfqNumber = `RFQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const fileExt = file.name.split(".").pop();
+        const fileName = `${rfqNumber}_${Date.now()}.${fileExt}`;
+        // Optimization: Use Year/Month based folders to allow parallel processing independent of user ID
+        const filePath = `${new Date().getFullYear()}/${fileName}`;
 
-    // 1. Auth Check - Get current user
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+        // Initialize Clients
+        const supabase = await createClient();
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const supabaseAdmin = createAdminClient();
 
-    let userId = user?.id;
-    let userEmail = user?.email;
+        console.time("Parallel_Tasks");
 
-    // 2. Handle Guest Logic
-    if (!userId) {
-        const email = formData.get("contact_email") as string;
-        const phone = formData.get("contact_phone") as string;
-        const name = formData.get("contact_name") as string;
+        // 2. Start Parallel Operations (Upload & Auth)
 
-        if (!email || !name || !phone) {
-            return { error: "Name, Email and Phone are required for new partners." };
-        }
-        userEmail = email;
+        // Task A: Upload File
+        const uploadPromise = supabaseAdmin.storage
+            .from("rfq-drawings")
+            .upload(filePath, file)
+            .then(result => {
+                if (result.error) throw new Error("Upload failed: " + result.error.message);
+                const { data: { publicUrl } } = supabaseAdmin.storage.from("rfq-drawings").getPublicUrl(filePath);
+                return publicUrl;
+            });
 
-        const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
+        // Task B: Get or Create User
+        const userPromise = (async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) return { userId: user.id, email: user.email };
 
-        // Check availability or Create User
-        const { data: newUser, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
-            email,
-            password: tempPassword,
-            email_confirm: true,
-            user_metadata: { full_name: name, phone: phone, role: 'buyer' }
-        });
+            // Handle Guest
+            const email = formData.get("contact_email") as string;
+            const phone = formData.get("contact_phone") as string;
+            const name = formData.get("contact_name") as string;
 
-        if (newUser.user) {
-            userId = newUser.user.id;
-            console.log(`[AUTO-REGISTER] Created new verified user ${userId}`);
+            if (!email || !name || !phone) throw new Error("Name, Email and Phone are required for new partners.");
 
-            // Attempt to sign them in for the frontend session
-            // Note: This sets cookies for the RESPONSE, but won't affect the current running function's "supabase" client
-            await supabase.auth.signInWithPassword({
+            const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
+
+            // Allow admin to create user without checking session
+            const { data: newUser, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
                 email,
                 password: tempPassword,
+                email_confirm: true,
+                user_metadata: { full_name: name, phone: phone, role: 'buyer' }
             });
-        } else {
-            console.log("[AUTO-REGISTER] Note:", signUpError?.message);
-            // If user exists, we try to use their email to find ID if possible, or proceed as anonymous for now?
-            // For Security, if user exists but isn't logged in, we shouldn't link data blindly.
-            // But for this MVP, if create fails, we might just proceed with userId = null (or guest)
-        }
+
+            if (newUser.user) {
+                // Background login attempt (non-blocking for the data flow, but wait for cookie set)
+                try {
+                    await supabase.auth.signInWithPassword({ email, password: tempPassword });
+                } catch (e) { console.warn("Auto-login failed", e); }
+
+                return { userId: newUser.user.id, email: newUser.user.email };
+            } else if (signUpError?.message?.includes("already registered")) {
+                console.log("User already exists, proceeding as unlinked RFQ");
+                return { userId: null, email };
+            }
+
+            return { userId: null, email };
+        })();
+
+        // 3. Await Parallel Tasks
+        const [publicUrl, userData] = await Promise.all([uploadPromise, userPromise]);
+        console.timeEnd("Parallel_Tasks");
+
+        // 4. Insert Record
+        const { error: dbError } = await supabaseAdmin.from("rfqs").insert({
+            user_id: userData.userId,
+            rfq_number: rfqNumber,
+            status: "Pending",
+            file_url: publicUrl,
+            file_name: file.name,
+            type: formData.get("type"),
+            quantity: formData.get("quantity") || null,
+            lead_time: formData.get("lead_time") || null,
+            target_price: formData.get("target_price") || null,
+            notes: formData.get("notes") || null,
+            contact_name: formData.get("contact_name") || null,
+            contact_email: userData.email || formData.get("contact_email"),
+            contact_phone: formData.get("contact_phone") || null,
+            updated_at: new Date().toISOString()
+        });
+
+        if (dbError) throw new Error("Failed to save RFQ details.");
+
+        revalidatePath("/dashboard/buyer");
+        console.timeEnd("submitRFQ_Total");
+        return { success: `Request ${rfqNumber} submitted successfully!` };
+
+    } catch (e: any) {
+        console.error("Unexpected Error in submitRFQ:", e);
+        if (process.env.NODE_ENV === "development") console.timeEnd("submitRFQ_Total");
+        return { error: e.message || "An unexpected system error occurred." };
     }
-
-    // 3. Prepare File Upload 
-    const file = formData.get("file") as File;
-    if (!file) return { error: "No file uploaded." };
-
-    const rfqNumber = `RFQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${rfqNumber}_${Date.now()}.${fileExt}`;
-    const filePath = `${userId || 'guest'}/${fileName}`;
-
-    // Upload using ADMIN client to bypass any "authenticated only" RLS issues if we are fresh
-    const { error: uploadError } = await supabaseAdmin.storage
-        .from("rfq-drawings")
-        .upload(filePath, file);
-
-    if (uploadError) {
-        console.error("Upload Error:", uploadError);
-        return { error: "Failed to upload file." };
-    }
-
-    const { data: { publicUrl } } = supabaseAdmin.storage.from("rfq-drawings").getPublicUrl(filePath);
-
-    // 4. Insert RFQ Record (Using Admin to ensure Insert RLS doesn't block)
-    const { error: dbError } = await supabaseAdmin.from("rfqs").insert({
-        user_id: userId || null,
-        rfq_number: rfqNumber,
-        status: "Pending",
-        file_url: publicUrl,
-        file_name: file.name,
-        type: formData.get("type"),
-        quantity: formData.get("quantity") || null,
-        lead_time: formData.get("lead_time") || null,
-        target_price: formData.get("target_price") || null,
-        notes: formData.get("notes") || null,
-        contact_name: formData.get("contact_name") || null,
-        contact_email: formData.get("contact_email") || null,
-        contact_phone: formData.get("contact_phone") || null,
-        updated_at: new Date().toISOString()
-    });
-
-    if (dbError) {
-        console.error("DB Error:", dbError);
-        return { error: "Failed to save RFQ details." };
-    }
-
-    revalidatePath("/dashboard/buyer");
-    return { success: `Request ${rfqNumber} submitted successfully!` };
 }
 
 export async function approveQuote(rfqId: string) {
