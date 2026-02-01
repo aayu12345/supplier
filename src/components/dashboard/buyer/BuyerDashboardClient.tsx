@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import DashboardHeader from "@/components/dashboard/buyer/DashboardHeader";
+import DashboardNav from "@/components/dashboard/buyer/DashboardNav";
 import HeroBanner from "@/components/dashboard/buyer/HeroBanner";
 import QuotesTable from "@/components/dashboard/buyer/quotes/QuotesTable";
 import RecentActivity from "@/components/dashboard/buyer/RecentActivity";
@@ -22,9 +23,10 @@ export default function BuyerDashboardClient({ userName, isLoggedIn, shouldOpenM
                 {/* Pass onUploadClick to Header */}
                 <div className="mb-8 block">
                     <HeaderWrapper userName={userName} onUploadClick={() => setIsModalOpen(true)} isLoggedIn={isLoggedIn} />
-                </div>
 
-                {/* HeroBanner Removed as per user request */}
+                    {/* Persistent Navigation */}
+                    <DashboardNav />
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Main Content Area */}
