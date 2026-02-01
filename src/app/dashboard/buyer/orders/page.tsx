@@ -20,4 +20,4 @@ export default async function MyOrdersPage() {
 }
 
 // Inline client wrapper for now to reuse the Header logic
-import OrdersPageClient from "./OrdersPageClient";
+import OrdersPageClient from "@/app/dashboard/buyer/orders/OrdersPageClient";

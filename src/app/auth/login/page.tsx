@@ -33,7 +33,12 @@ export default function LoginPage() {
         const result = await login(formData);
 
         if (result?.error) {
-            alert(result.error); // Simple error handling for now
+            alert(result.error);
+        } else {
+            // If successful, the server action redirects. 
+            // We can keep the state as 'isSubmitting' or set a new 'isRedirecting' state to show "Redirecting..."
+            // Since isSubmitting stays true until the promise resolves (and redirecting never resolves this promise effectively as the page changes), 
+            // we just need to make sure the UI reflects that something is happening.
         }
     };
 

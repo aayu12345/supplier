@@ -85,10 +85,11 @@ export default function DashboardHeader({ userName, onUploadClick, isLoggedIn = 
 
                 <button
                     onClick={onUploadClick}
-                    className="hidden md:flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white p-2.5 md:px-5 md:py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+                    title="Upload RFQ"
                 >
                     <Upload className="h-5 w-5" />
-                    Upload RFQ
+                    <span className="hidden md:inline">Upload RFQ</span>
                 </button>
             </div>
         </div>
