@@ -1,7 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import DashboardHeader from "@/components/dashboard/buyer/DashboardHeader";
-import OrdersTable from "@/components/dashboard/buyer/orders/OrdersTable";
-import RFQUploadModalWrapper from "@/components/dashboard/buyer/RFQUploadModalWrapper"; // Assuming we make a wrapper
+
 
 export default async function MyOrdersPage() {
     const supabase = await createClient();
