@@ -1,4 +1,7 @@
-import { Shield, User, Factory, ArrowRight } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Shield, User, Factory, ArrowRight, LogIn, UserPlus } from "lucide-react";
 import Link from "next/link";
 
 const roles = [
@@ -32,6 +35,8 @@ const roles = [
 ];
 
 export default function DemoSection() {
+    const [showSupplierOptions, setShowSupplierOptions] = useState(false);
+
     return (
         <section id="demo" className="py-24 bg-gray-50/50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -60,12 +65,21 @@ export default function DemoSection() {
                                 {role.title}
                             </h3>
                             <p className="text-gray-600 mb-8 flex-grow">{role.description}</p>
+
                             {role.slug === "buyer" ? (
                                 <Link
                                     href="/start/buyer"
                                     className="inline-flex items-center justify-center w-full px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-medium"
                                 >
                                     Enter as Buyer
+                                    <ArrowRight className="ml-2 h-5 w-5" />
+                                </Link>
+                            ) : role.slug === "supplier" ? (
+                                <Link
+                                    href="/start/supplier"
+                                    className="inline-flex items-center justify-center w-full px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50 transition-colors font-medium"
+                                >
+                                    Enter as Supplier
                                     <ArrowRight className="ml-2 h-5 w-5" />
                                 </Link>
                             ) : (

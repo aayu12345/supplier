@@ -17,11 +17,31 @@ export async function login(formData: FormData) {
         password,
     });
 
+    // --- LOGIN LOGIC ---
     if (error) {
         return { error: error.message };
     }
 
-    revalidatePath("/dashboard/buyer");
+    // Fetch user profile to check role
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        const roles = Array.isArray(profile?.role) ? profile.role : [profile?.role];
+
+        if (roles.includes('admin')) {
+            redirect("/admin/dashboard");
+        } else if (roles.includes('supplier')) {
+            redirect("/dashboard/supplier");
+        } else {
+            redirect("/dashboard/buyer");
+        }
+    }
+
     redirect("/dashboard/buyer");
 }
 
@@ -45,7 +65,7 @@ export async function signup(formData: FormData) {
         user_metadata: {
             name,
             phone,
-            role,
+            role, // Trigger will handle this into profile
         },
     });
 
@@ -63,8 +83,16 @@ export async function signup(formData: FormData) {
         return { error: "Account created but failed to sign in automatically." };
     }
 
-    revalidatePath("/dashboard/buyer");
-    redirect("/dashboard/buyer");
+    // Redirect based on the REGISTERED role
+    if (role === 'supplier') {
+        revalidatePath("/dashboard/supplier");
+        redirect("/dashboard/supplier");
+    } else if (role === 'admin') {
+        redirect("/admin/dashboard");
+    } else {
+        revalidatePath("/dashboard/buyer");
+        redirect("/dashboard/buyer");
+    }
 }
 
 export async function signOut() {

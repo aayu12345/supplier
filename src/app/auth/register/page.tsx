@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 const registerSchema = z.object({
     name: z.string().min(2, "Name is required"),
@@ -17,7 +18,9 @@ const registerSchema = z.object({
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
-    const [role, setRole] = useState<"buyer" | "supplier" | null>(null);
+    const searchParams = useSearchParams();
+    const roleParam = searchParams.get("role") as "buyer" | "supplier" | null;
+    const [role, setRole] = useState<"buyer" | "supplier" | null>(roleParam || null);
 
     const {
         register,
@@ -28,14 +31,20 @@ export default function RegisterPage() {
     });
 
     const onSubmit = async (data: RegisterFormData) => {
-        if (!role) return;
+        // Use local state or param, fallback to error if neither
+        const finalRole = role || roleParam;
+
+        if (!finalRole) {
+            alert("Please select a role (Buyer/Supplier)");
+            return;
+        }
 
         const formData = new FormData();
         formData.append("name", data.name);
         formData.append("phone", data.phone);
         formData.append("email", data.email);
         formData.append("password", data.password);
-        formData.append("role", role);
+        formData.append("role", finalRole);
 
         const { signup } = await import("../actions");
         const result = await signup(formData) as { error?: string, success?: string };
@@ -63,11 +72,10 @@ export default function RegisterPage() {
                 </div>
 
                 <div>
-                    {/* Add country code prefix if needed later */}
                     <input
                         {...register("phone")}
                         type="tel"
-                        placeholder="+1 Phone Number"
+                        placeholder="Phone Number"
                         className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                     />
                     {errors.phone && (
@@ -99,8 +107,8 @@ export default function RegisterPage() {
                     )}
                 </div>
 
+                {/* Submit Buttons */}
                 <div className="space-y-3 pt-2">
-                    {/* Split buttons for Buyer/Supplier registration */}
                     <button
                         type="submit"
                         onClick={() => setRole("buyer")}
@@ -161,6 +169,6 @@ export default function RegisterPage() {
                     Terms & Conditions
                 </Link>
             </div>
-        </AuthLayout>
+        </AuthLayout >
     );
 }
