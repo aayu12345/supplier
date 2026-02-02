@@ -8,6 +8,8 @@ import * as z from "zod";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+import { Suspense } from "react";
+
 const registerSchema = z.object({
     name: z.string().min(2, "Name is required"),
     phone: z.string().min(10, "Valid phone number is required"),
@@ -17,7 +19,7 @@ const registerSchema = z.object({
 
 type RegisterFormData = z.infer<typeof registerSchema>;
 
-export default function RegisterPage() {
+function RegisterForm() {
     const searchParams = useSearchParams();
     const roleParam = searchParams.get("role") as "buyer" | "supplier" | null;
     const [role, setRole] = useState<"buyer" | "supplier" | null>(roleParam || null);
@@ -170,5 +172,13 @@ export default function RegisterPage() {
                 </Link>
             </div>
         </AuthLayout >
+    );
+}
+
+export default function RegisterPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <RegisterForm />
+        </Suspense>
     );
 }
