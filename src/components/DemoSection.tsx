@@ -70,7 +70,7 @@ export default function DemoSection() {
                                 </Link>
                             ) : (
                                 <Link
-                                    href={`/dashboard/${role.slug}`}
+                                    href={role.slug === "admin" ? "/admin/dashboard" : `/dashboard/${role.slug}`}
                                     className={`w-full inline-flex items-center justify-center px-6 py-3 text-base font-semibold rounded-lg transition-colors ${role.buttonColor}`}
                                 >
                                     Enter as {role.title}

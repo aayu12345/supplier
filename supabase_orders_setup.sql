@@ -1,34 +1,47 @@
--- Add columns to rfqs table for Order Management
-ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS po_file_url TEXT;
-ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS order_status TEXT DEFAULT 'In Progress'; -- 'In Progress', 'Dispatched', 'Delivered'
-ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS proforma_invoice_url TEXT;
-ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS final_invoice_url TEXT;
-ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS qc_report_url TEXT;
-ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS transport_receipt_url TEXT;
+-- Create Orders Table
+CREATE TABLE IF NOT EXISTS public.orders (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    rfq_id UUID REFERENCES public.rfqs(id) ON DELETE CASCADE,
+    buyer_id UUID REFERENCES public.profiles(id), -- Linked to the buyer profile
+    order_number TEXT NOT NULL, -- e.g. "ORD-2026-1052"
+    status TEXT DEFAULT 'In Progress', -- 'In Progress', 'Completed', 'Cancelled'
+    
+    -- Financials
+    currency TEXT DEFAULT 'USD',
+    total_value NUMERIC,
+    
+    -- Documents (URLs)
+    po_url TEXT,
+    pi_url TEXT,
+    final_quote_url TEXT,
+    dispatch_url TEXT, -- For completed orders
 
--- Create Order Timeline Table
-CREATE TABLE IF NOT EXISTS order_timeline (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  rfq_id UUID REFERENCES rfqs(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  description TEXT,
-  file_url TEXT,
-  file_name TEXT,
-  status TEXT DEFAULT 'Completed', -- 'Completed', 'Pending'
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    -- Dates
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    completed_at TIMESTAMP WITH TIME ZONE
 );
 
--- RLS Policies for Timeline
-ALTER TABLE order_timeline ENABLE ROW LEVEL SECURITY;
+-- Create Order Timeline Table
+CREATE TABLE IF NOT EXISTS public.order_timeline (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    order_id UUID REFERENCES public.orders(id) ON DELETE CASCADE,
+    
+    title TEXT NOT NULL, -- e.g. "Material Ordered"
+    description TEXT,
+    status TEXT DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected')), -- Admin approval status
+    visible_to_buyer BOOLEAN DEFAULT FALSE, -- Admin control
+    
+    -- Metadata
+    step_date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    attachment_url TEXT, -- Optional image/doc
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
-CREATE POLICY "Users can view timeline for their own RFQs" ON order_timeline
-  FOR SELECT USING (
-    exists (
-      select 1 from rfqs
-      where rfqs.id = order_timeline.rfq_id
-      and rfqs.user_id = auth.uid()
-    )
-  );
+-- RLS Policies (Simple for now: Admin all access, Buyer own items)
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_timeline ENABLE ROW LEVEL SECURITY;
 
--- Allow Admins to manage timeline (Assuming admin has service role or similar, generic policy for now)
--- You might want to run this in the Supabase Dashboard SQL Editor
+-- Admin Policy (Assuming role='admin' in profiles or handled via app logic for now, keeping it open for dev)
+CREATE POLICY "Enable all access for authenticated users" ON public.orders FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable all access for authenticated users" ON public.order_timeline FOR ALL USING (auth.role() = 'authenticated');

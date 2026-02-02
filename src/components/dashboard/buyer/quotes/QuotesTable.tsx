@@ -53,7 +53,8 @@ export default function QuotesTable() {
             if (error) throw error;
             setRfqs(data as unknown as RFQ[]); // Type assertion for now as DB types might be loose
         } catch (error) {
-            console.error("Error fetching RFQs:", error);
+            console.error("Error fetching RFQs (Full):", JSON.stringify(error, null, 2));
+            console.error("Error Message:", (error as Error).message);
         } finally {
             setLoading(false);
         }
