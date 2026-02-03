@@ -31,12 +31,28 @@ export async function login(formData: FormData) {
             .eq('id', user.id)
             .single();
 
-        const roles = Array.isArray(profile?.role) ? profile.role : [profile?.role];
+        const roles = Array.isArray(profile?.role) ? profile.role : [profile?.role || ""];
+        const loginRole = formData.get("login_role") as string;
 
-        if (roles.includes('admin')) {
-            redirect("/admin/dashboard");
-        } else if (roles.includes('supplier')) {
+        // 1. If explicit role requested and user HAS that role, go there
+        if (loginRole && roles.includes(loginRole)) {
+            if (loginRole === 'supplier') {
+                revalidatePath("/dashboard/supplier");
+                redirect("/dashboard/supplier");
+            } else if (loginRole === 'buyer') {
+                revalidatePath("/dashboard/buyer");
+                redirect("/dashboard/buyer");
+            } else if (loginRole === 'admin') {
+                redirect("/admin/dashboard");
+            }
+        }
+
+        // 2. Fallback Priority (if no specific role requested or invalid request)
+        if (roles.includes('supplier')) {
+            revalidatePath("/dashboard/supplier");
             redirect("/dashboard/supplier");
+        } else if (roles.includes('admin')) {
+            redirect("/admin/dashboard");
         } else {
             redirect("/dashboard/buyer");
         }
@@ -98,6 +114,6 @@ export async function signup(formData: FormData) {
 export async function signOut() {
     const supabase = await createClient();
     await supabase.auth.signOut();
-    revalidatePath("/dashboard/buyer");
-    redirect("/dashboard/buyer");
+    revalidatePath("/");
+    redirect("/start/supplier");
 }

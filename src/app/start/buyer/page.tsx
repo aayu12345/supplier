@@ -28,7 +28,7 @@ export default function BuyerEntryPage() {
                 <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 space-y-4">
 
                     {/* Option 1: Login */}
-                    <Link href="/auth/login" className="flex items-center p-4 border border-gray-200 rounded-xl hover:bg-blue-50 hover:border-blue-200 transition-all group">
+                    <Link href="/auth/login?role=buyer" className="flex items-center p-4 border border-gray-200 rounded-xl hover:bg-blue-50 hover:border-blue-200 transition-all group">
                         <div className="bg-blue-100 p-3 rounded-full text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                             <LogIn className="h-6 w-6" />
                         </div>

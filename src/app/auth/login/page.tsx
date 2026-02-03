@@ -5,6 +5,7 @@ import AuthLayout from "@/components/auth/AuthLayout";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useSearchParams } from "next/navigation";
 
 const loginSchema = z.object({
     email: z.string().min(1, "Email or Mobile is required"),
@@ -23,22 +24,22 @@ export default function LoginPage() {
         resolver: zodResolver(loginSchema),
     });
 
+    const searchParams = useSearchParams();
+    const roleParam = searchParams.get("role");
+
     const onSubmit = async (data: LoginFormData) => {
         const formData = new FormData();
         formData.append("email", data.email);
         formData.append("password", data.password);
+        if (roleParam) {
+            formData.append("login_role", roleParam);
+        }
 
-        // Import dynamically or pass as prop if needed, but direct import works in Next.js 14+ client components for server actions
         const { login } = await import("../actions");
         const result = await login(formData);
 
         if (result?.error) {
             alert(result.error);
-        } else {
-            // If successful, the server action redirects. 
-            // We can keep the state as 'isSubmitting' or set a new 'isRedirecting' state to show "Redirecting..."
-            // Since isSubmitting stays true until the promise resolves (and redirecting never resolves this promise effectively as the page changes), 
-            // we just need to make sure the UI reflects that something is happening.
         }
     };
 
