@@ -15,7 +15,11 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+import { Suspense } from "react";
+
+// ... existing imports
+
+function LoginForm() {
     const {
         register,
         handleSubmit,
@@ -141,5 +145,13 @@ export default function LoginPage() {
                 </p>
             </div>
         </AuthLayout>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <LoginForm />
+        </Suspense>
     );
 }
