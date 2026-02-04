@@ -208,8 +208,8 @@ export default async function SupplierDashboard() {
                 {/* 1. HERO SECTION */}
                 <DashboardHero metrics={stats} />
 
-                {/* 2. ACTION TILES (3 Grid) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 2. ACTION TILES (4 Grid) */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <ActionTile
                         icon={FileText}
                         label="View RFQs"
@@ -221,6 +221,12 @@ export default async function SupplierDashboard() {
                         label="My RFQs"
                         href="/dashboard/supplier/my-rfqs"
                         colorClass="bg-purple-500"
+                    />
+                    <ActionTile
+                        icon={Factory}
+                        label="My Orders"
+                        href="/dashboard/supplier/orders"
+                        colorClass="bg-orange-500"
                     />
                     <ActionTile
                         icon={CreditCard}

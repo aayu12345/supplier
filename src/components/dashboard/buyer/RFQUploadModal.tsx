@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Calendar, Info } from "lucide-react";
+import { X, Calendar, Info, FileText } from "lucide-react";
 import { useState } from "react";
 import FileUploadZone from "@/components/ui/FileUploadZone";
 import { useRouter } from "next/navigation";
@@ -17,13 +17,53 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
     const [isSubmitting, setIsSubmitting] = useState(false);
     const router = useRouter();
 
+    type RFQItem = {
+        drawing_number: string;
+        quantity: string;
+        target_price: string;
+        lead_time: string;
+        file: File | null;
+    };
+
+    const [items, setItems] = useState<RFQItem[]>([
+        { drawing_number: "", quantity: "", target_price: "", lead_time: "", file: null }
+    ]);
+
+    const addItem = () => {
+        setItems([...items, { drawing_number: "", quantity: "", target_price: "", lead_time: "", file: null }]);
+    };
+
+    const removeItem = (index: number) => {
+        const newItems = items.filter((_, i) => i !== index);
+        setItems(newItems);
+    };
+
+    const updateItem = (index: number, field: keyof RFQItem, value: any) => {
+        const newItems = [...items];
+        // @ts-ignore
+        newItems[index][field] = value;
+        setItems(newItems);
+    };
+
     if (!isOpen) return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!file) {
+
+        if (rfqType === "single" && !file) {
             alert("Please upload a drawing file.");
             return;
+        }
+
+        if (rfqType === "multiple") {
+            // Validate that at least one item exists
+            if (items.length === 0) {
+                alert("Please add at least one item.");
+                return;
+            }
+            // Optional: Validate that items have files?
+            // const missingFiles = items.filter(i => !i.file);
+            // if (missingFiles.length > 0) { alert("Please upload drawings for all items."); return; }
         }
 
         setIsSubmitting(true);
@@ -32,8 +72,28 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
             const form = e.target as HTMLFormElement;
             const data = new FormData(form);
 
-            data.set("file", file);
+            if (file) {
+                data.set("file", file);
+            }
             data.set("type", rfqType);
+
+            if (rfqType === "multiple") {
+                // Strip files from JSON to act as metadata
+                const itemsMeta = items.map(item => ({
+                    drawing_number: item.drawing_number,
+                    quantity: item.quantity,
+                    target_price: item.target_price,
+                    lead_time: item.lead_time
+                }));
+                data.set("items", JSON.stringify(itemsMeta));
+
+                // Append files separately
+                items.forEach((item, index) => {
+                    if (item.file) {
+                        data.append(`item_file_${index}`, item.file);
+                    }
+                });
+            }
 
             // Call Server Action
             const { submitRFQ } = await import("@/app/dashboard/buyer/actions");
@@ -76,15 +136,17 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-8">
-                    {/* Section 1: File Upload */}
-                    <section>
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-                                1. Upload Drawing <span className="text-red-500">*</span>
-                            </h3>
-                        </div>
-                        <FileUploadZone onFileSelect={setFile} selectedFile={file} />
-                    </section>
+                    {/* Section 1: File Upload (Only for Single Type) */}
+                    {rfqType === "single" && (
+                        <section>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+                                    1. Upload Drawing <span className="text-red-500">*</span>
+                                </h3>
+                            </div>
+                            <FileUploadZone onFileSelect={setFile} selectedFile={file} />
+                        </section>
+                    )}
 
                     {/* Section 2: RFQ Type */}
                     <section>
@@ -116,51 +178,156 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
                     </section>
 
                     {/* Section 3: Conditional Fields */}
-                    <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {rfqType === "single" && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Quantity
-                                </label>
-                                <input
-                                    name="quantity"
-                                    type="number"
-                                    placeholder="e.g. 100"
-                                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                                />
-                            </div>
-                        )}
-
-                        <div className={rfqType === "multiple" ? "md:col-span-2" : ""}>
-                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                                Lead Time (Optional)
-                            </label>
-                            <input
-                                name="lead_time"
-                                type="date"
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                            />
-                        </div>
-
-                        {rfqType === "single" && (
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Target Price (Optional)
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                    <section className="space-y-6">
+                        {rfqType === "single" ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Quantity
+                                    </label>
                                     <input
-                                        name="target_price"
+                                        name="quantity"
                                         type="number"
-                                        placeholder="0.00"
-                                        className="w-full pl-8 pr-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="e.g. 100"
+                                        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
                                 </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-gray-400" />
+                                        Lead Time (Optional)
+                                    </label>
+                                    <input
+                                        name="lead_time"
+                                        type="date"
+                                        className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Target Price (Optional)
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                                        <input
+                                            name="target_price"
+                                            type="number"
+                                            placeholder="0.00"
+                                            className="w-full pl-8 pr-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-gray-900 uppercase">3. ITEMS</h4>
+                                {items.map((item, index) => (
+                                    <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200 relative group">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Drawing #</label>
+                                            <input
+                                                type="text"
+                                                placeholder="DWG-001"
+                                                value={item.drawing_number}
+                                                onChange={(e) => updateItem(index, "drawing_number", e.target.value)}
+                                                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Quantity</label>
+                                            <input
+                                                type="number"
+                                                placeholder="100"
+                                                value={item.quantity}
+                                                onChange={(e) => updateItem(index, "quantity", e.target.value)}
+                                                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Target Price</label>
+                                            <div className="relative">
+                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                                                <input
+                                                    type="number"
+                                                    placeholder="2.50"
+                                                    value={item.target_price}
+                                                    onChange={(e) => updateItem(index, "target_price", e.target.value)}
+                                                    className="w-full pl-5 pr-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Lead Time</label>
+                                            <input
+                                                type="date"
+                                                value={item.lead_time}
+                                                onChange={(e) => updateItem(index, "lead_time", e.target.value)}
+                                                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                                            />
+                                        </div>
+
+                                        {/* Item File Upload */}
+                                        <div className="md:col-span-4 flex items-center gap-2">
+                                            <label className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md cursor-pointer transition-colors text-xs font-medium border border-gray-200">
+                                                <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) updateItem(index, "file", file);
+                                                    }}
+                                                />
+                                                {item.file ? (
+                                                    <span className="text-blue-600 flex items-center gap-1">
+                                                        <FileText className="h-3 w-3" />
+                                                        {item.file.name}
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <span className="h-4 w-4 flex items-center justify-center border border-gray-400 rounded-sm">
+                                                            <span className="text-[10px]">+</span>
+                                                        </span>
+                                                        Upload Drawing
+                                                    </>
+                                                )}
+                                            </label>
+                                            {item.file && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateItem(index, "file", null)}
+                                                    className="text-red-500 hover:text-red-700 p-1"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {items.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeItem(index)}
+                                                className="absolute -top-2 -right-2 bg-white text-red-500 border border-gray-200 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={addItem}
+                                    className="text-sm text-blue-600 font-medium hover:text-blue-700 flex items-center gap-1"
+                                >
+                                    + Add More Item
+                                </button>
                             </div>
                         )}
 
-                        <div className="md:col-span-2">
+                        <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Notes
                             </label>

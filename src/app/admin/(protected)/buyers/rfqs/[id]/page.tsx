@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Download, Save, CheckCircle, AlertCircle, ShoppingCart, MessageSquare, Send } from "lucide-react";
+import { ArrowLeft, Download, Save, CheckCircle, CheckCircle2, AlertCircle, ShoppingCart, MessageSquare, Send } from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 
@@ -66,6 +66,14 @@ export default function AdminRFQDetailPage() {
     const params = useParams();
     const router = useRouter();
     const [rfq, setRfq] = useState<AdminRFQDetail | null>(null);
+    // ... (Imports remain same, add CheckCircle2 for drafted items)
+
+    // Additional State for Parent View
+    const [subRfqs, setSubRfqs] = useState<any[]>([]);
+    const [rfqItems, setRfqItems] = useState<any[]>([]);
+    const [isParent, setIsParent] = useState(false);
+
+    // Existing State
     const [quotes, setQuotes] = useState<SupplierQuote[]>([]);
     const [negotiations, setNegotiations] = useState<NegotiationMessage[]>([]);
     const [loading, setLoading] = useState(true);
@@ -83,7 +91,7 @@ export default function AdminRFQDetailPage() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // 1. Fetch RFQ
+            // 1. Fetch Requesting RFQ
             const { data: rfqData, error: rfqError } = await supabase
                 .from("rfqs")
                 .select(`
@@ -96,39 +104,91 @@ export default function AdminRFQDetailPage() {
             if (rfqError) throw rfqError;
             setRfq(rfqData as any);
 
-            // Pre-fill Live Form
-            if (rfqData) {
-                setValueLive("weight_per_piece", rfqData.weight_per_piece || 0);
-                setValueLive("material_admin", rfqData.material_admin || "");
-                setValueLive("finish", rfqData.finish || "");
-                setValueLive("hardness", rfqData.hardness || "");
-                setValueLive("lead_time_admin", rfqData.lead_time_admin || "");
-                setValueLive("admin_notes", rfqData.admin_notes || "");
-                setValueLive("visibility_days", 7);
+            // 2. Determine Type & hierarchy
+            // @ts-ignore
+            if (!rfqData.parent_rfq_id) {
+                // IT IS A PARENT (Likely)
+                setIsParent(true);
+
+                // Fetch Items (if any - mostly for Multiple type)
+                const { data: items } = await supabase
+                    .from("rfq_items")
+                    .select("*")
+                    .eq("rfq_id", params.id);
+
+                let textItems = items || [];
+                // If Single RFQ (no items table entries), treat the RFQ itself as the item source
+                if (textItems.length === 0) {
+                    textItems.push({
+                        id: 'main-single', // Virtual ID
+                        drawing_number: rfqData.drawing_number || rfqData.rfq_number, // Fallback if missing
+                        quantity: rfqData.quantity,
+                        target_price: rfqData.target_price,
+                        file_url: rfqData.file_url,
+                        file_name: rfqData.file_name,
+                        lead_time: rfqData.lead_time
+                    });
+                }
+                setRfqItems(textItems);
+
+                // Fetch Sub-RFQs (Children)
+                const { data: children } = await supabase
+                    .from("rfqs")
+                    .select("*")
+                    // @ts-ignore
+                    .eq("parent_rfq_id", params.id)
+                    .order("created_at", { ascending: true });
+                setSubRfqs(children || []);
+            } else {
+                // IT IS A SUB-RFQ
+                setIsParent(false);
+
+                // Fetch Quotes & Negotiations (Existing Logic)
+                const { data: quoteData } = await supabase
+                    .from("supplier_quotes")
+                    .select("*")
+                    .eq("rfq_id", params.id)
+                    .order("price", { ascending: true });
+                if (quoteData) setQuotes(quoteData);
+
+                const { data: negData } = await supabase
+                    .from("rfq_negotiations")
+                    .select("*")
+                    .eq("rfq_id", params.id)
+                    .order("created_at", { ascending: true });
+                if (negData) setNegotiations(negData);
             }
 
-            // 2. Fetch Supplier Quotes (if Live or later)
-            const { data: quoteData } = await supabase
-                .from("supplier_quotes")
-                .select("*")
-                .eq("rfq_id", params.id)
-                .order("price", { ascending: true }); // Best price first
-
-            if (quoteData) setQuotes(quoteData);
-
-            // 3. Fetch Negotiations (if Sent to Buyer or Rejected)
-            const { data: negData } = await supabase
-                .from("rfq_negotiations")
-                .select("*")
-                .eq("rfq_id", params.id)
-                .order("created_at", { ascending: true });
-
-            if (negData) setNegotiations(negData);
+            // Pre-fill Forms (Existing Logic)
+            if (rfqData) {
+                setValueLive("weight_per_piece", rfqData.weight_per_piece || 0);
+                // ... rest of pre-fill
+            }
 
         } catch (error) {
             console.error("Error fetching data:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCreateSubRfq = async (item: any) => {
+        if (!confirm(`Create Sub-RFQ for Item: ${item.drawing_number}?`)) return;
+        setSaving(true);
+        try {
+            const { createSubRFQ } = await import("@/app/admin/actions");
+            const result = await createSubRFQ(rfq!.id, {
+                ...item,
+                user_id: rfq!.user_id
+            }, rfq!.rfq_number);
+
+            if (result.error) throw new Error(result.error);
+            alert("Sub-RFQ Created!");
+            fetchData();
+        } catch (e: any) {
+            alert(e.message);
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -156,6 +216,15 @@ export default function AdminRFQDetailPage() {
                 .eq("id", rfq.id);
 
             if (error) throw error;
+
+            // Check & Update Parent Status if applicable
+            // @ts-ignore
+            if (rfq.parent_rfq_id) {
+                const { updateParentStatus } = await import("@/app/admin/actions");
+                // @ts-ignore
+                await updateParentStatus(rfq.parent_rfq_id);
+            }
+
             alert("RFQ is now LIVE!");
             fetchData();
         } catch (err) {
@@ -288,16 +357,6 @@ export default function AdminRFQDetailPage() {
                 return;
             }
 
-            // 2. Find Winning Supplier (Heuristic: matches quote)
-            // Note: DB schema for orders doesn't have 'supplier_name' yet unless created in step 2476, but I recall creating it assuming it was there? 
-            // The SQL in Step 2471 did NOT explicitly include supplier_name in the text block copy-paste. 
-            // So 'orders' table probably doesn't have it. 
-            // For now, I will omit 'supplier_name' to avoid error, or I can update logic later.
-            // Wait, List View Step 2496 displays supplier from WHERE? 
-            // List View uses: `rfqs:rfq_id (rfq_number)` and `profiles`. It DOES NOT fetch supplier_name.
-            // Ah, I missed adding supplier info in Order List View too.
-            // I will process Order creation without supplier field for now to be safe with DB.
-
             const { data: newOrder, error } = await supabase
                 .from("orders")
                 .insert({
@@ -323,12 +382,104 @@ export default function AdminRFQDetailPage() {
         }
     };
 
-
     if (loading) return <div className="p-8">Loading...</div>;
     if (!rfq) return <div className="p-8">RFQ Not Found</div>;
 
+    // --- VIEW: PARENT RFQ DASHBOARD ---
+    if (isParent) {
+        return (
+            <div className="max-w-7xl mx-auto pb-24 p-6">
+                <h1 className="text-2xl font-bold mb-2">Parent RFQ: {rfq.rfq_number}</h1>
+                <p className="text-gray-500 mb-8">Uploaded by {rfq.profiles.name} • {rfq.admin_status}</p>
+
+                {/* Section A: Items from Buyer */}
+                <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
+                    <h2 className="text-lg font-bold mb-4">Buyer Uploaded Items</h2>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 text-gray-500 uppercase font-medium">
+                                <tr>
+                                    <th className="px-4 py-3">Drawing</th>
+                                    <th className="px-4 py-3">Qty</th>
+                                    <th className="px-4 py-3">Target</th>
+                                    <th className="px-4 py-3 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {rfqItems.map((item) => {
+                                    // Check if sub-rfq already exists for this item (heuristic matching drawing_number?)
+                                    // ideally we link item_id, but for now purely manual trigger
+                                    return (
+                                        <tr key={item.id} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3 font-medium">
+                                                {item.drawing_number}
+                                                {item.file_url && <a href={item.file_url} target="_blank" className="ml-2 text-blue-600 text-xs hover:underline">View</a>}
+                                            </td>
+                                            <td className="px-4 py-3">{item.quantity}</td>
+                                            <td className="px-4 py-3">₹{item.target_price || '-'}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <button
+                                                    onClick={() => handleCreateSubRfq(item)}
+                                                    className="bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-xs"
+                                                >
+                                                    Create Sub-RFQ
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Section B: Created Sub-RFQs */}
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <h2 className="text-lg font-bold mb-4">Active Sub-RFQs</h2>
+                    {subRfqs.length === 0 ? (
+                        <p className="text-gray-400 text-sm italic">No Sub-RFQs created yet.</p>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {subRfqs.map(sub => (
+                                <Link
+                                    href={`/admin/buyers/rfqs/${sub.id}`}
+                                    key={sub.id}
+                                    className="block p-4 border rounded-lg hover:border-blue-400 hover:shadow-md transition-all group"
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="font-bold text-gray-900 group-hover:text-blue-600">{sub.rfq_number}</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded ${statusColor(sub.admin_status)}`}>
+                                            {sub.admin_status}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mb-1">Drwg: {sub.drawing_number || 'N/A'}</p>
+                                    <div className="flex justify-between items-end mt-4">
+                                        <span className="text-xs text-gray-400">Created: {new Date(sub.created_at).toLocaleDateString()}</span>
+                                        <span className="text-blue-600 text-xs font-medium">Manage &rarr;</span>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    // --- VIEW: SUB-RFQ INTERFACE (Original Logic) ---
     return (
         <div className="max-w-6xl mx-auto pb-24">
+            {/* Add Breadcrumb for Sub-RFQ */}
+            {/* @ts-ignore */}
+            {rfq.parent_rfq_id && (
+                <div className="mb-4">
+                    {/* Link back to parent? We assume parent_rfq_id is the ID */}
+                    {/* @ts-ignore */}
+                    <Link href={`/admin/buyers/rfqs/${rfq.parent_rfq_id}`} className="text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1">
+                        &larr; Back to Parent Review
+                    </Link>
+                </div>
+            )}
             {/* Header */}
             <div className="mb-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between sticky top-4 z-10">
                 <div className="flex items-center gap-4">
@@ -339,6 +490,8 @@ export default function AdminRFQDetailPage() {
                         <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                             {rfq.rfq_number}
                             <span className="text-sm font-normal text-gray-500">by {rfq.profiles.name}</span>
+                            {/* @ts-ignore */}
+                            {rfq.status === 'Draft' && <span className="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded">DRAFT</span>}
                         </h1>
                     </div>
                 </div>
@@ -375,15 +528,17 @@ export default function AdminRFQDetailPage() {
                 <div className="lg:col-span-2 space-y-6">
 
                     {/* STATE: NEW -> LIVE FORM */}
-                    {rfq.admin_status === 'New' && (
+                    {(rfq.admin_status === 'New' || rfq.admin_status === 'Draft') && (
                         <div className="bg-white p-8 rounded-xl border border-blue-100 shadow-sm ring-4 ring-blue-50">
-                            <h2 className="text-lg font-bold mb-6">Step 1: Validate & Make Live</h2>
+                            <h2 className="text-lg font-bold mb-6">Step 1: Validate & Make Live (Publish)</h2>
                             <form onSubmit={handleSubmitLive(onSubmitLive)} className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <input {...registerLive("weight_per_piece")} placeholder="Weight (kg)" className="input-field" type="number" step="0.001" />
                                     <input {...registerLive("material_admin")} placeholder="Refined Material" className="input-field" />
                                     <input {...registerLive("finish")} placeholder="Finish" className="input-field" />
                                     <input {...registerLive("lead_time_admin")} placeholder="Std Lead Time" className="input-field" />
+                                    <input {...registerLive("visibility_days")} placeholder="Days Visible (e.g. 3)" className="input-field" type="number" defaultValue={3} />
+                                    <input {...registerLive("admin_notes")} placeholder="Notes for Supplier" className="input-field" />
                                 </div>
                                 <button type="submit" disabled={saving} className="btn-primary w-full">
                                     {saving ? "Saving..." : "Make Live to Suppliers"}

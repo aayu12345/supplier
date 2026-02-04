@@ -40,7 +40,7 @@ export default function AdminRFQsPage() {
         // Assuming tab names match status exactly for simplicity.
 
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from("rfqs")
                 .select(`
                     id,
@@ -56,8 +56,18 @@ export default function AdminRFQsPage() {
                         email
                     )
                 `)
-                .eq("admin_status", activeTab)
                 .order("created_at", { ascending: false });
+
+            // Apply filters based on tab
+            if (activeTab === "New") {
+                query = query.in("admin_status", ["New", "Drafts Created"]);
+            } else if (activeTab === "Live") {
+                query = query.in("admin_status", ["Live", "Live Running"]);
+            } else {
+                query = query.eq("admin_status", activeTab);
+            }
+
+            const { data, error } = await query;
 
             if (error) {
                 console.error("Error fetching RFQs (Full):", JSON.stringify(error, null, 2));
