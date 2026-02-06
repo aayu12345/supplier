@@ -25,18 +25,18 @@ export default function AdminDashboardPage() {
                     </div>
                 </Link>
 
-                {/* Supplier Section (Coming Soon/WIP) */}
-                <Link href="/dashboard/supplier" className="block group">
+                {/* Supplier Management Section */}
+                <Link href="/admin/suppliers" className="block group">
                     <div className="p-8 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-green-500 hover:ring-2 hover:ring-green-200 transition-all cursor-pointer h-full">
                         <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center mb-6 text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
                             <ShoppingBag className="h-6 w-6" />
                         </div>
-                        <h2 className="text-xl font-bold text-gray-900 mb-2">Supplier Portal</h2>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Supplier Panel</h2>
                         <p className="text-gray-500">
-                            Switch to Supplier view to verify RFQs and submit quotes.
+                            Manage suppliers, view trust scores, track activity, and monitor quotes.
                         </p>
                         <div className="mt-6 text-green-600 font-medium group-hover:translate-x-1 transition-transform inline-flex items-center gap-2">
-                            Go to Supplier View &rarr;
+                            Go to Suppliers &rarr;
                         </div>
                     </div>
                 </Link>
