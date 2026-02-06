@@ -213,7 +213,6 @@ export async function approveQuote(rfqId: string) {
 export async function signOut() {
     const supabase = await createClient();
     await supabase.auth.signOut();
-    // Only revalidate the dashboard, not the whole layout.
-    revalidatePath("/dashboard/buyer");
-    redirect("/dashboard/buyer");
+    revalidatePath("/");
+    redirect("/start/buyer");
 }

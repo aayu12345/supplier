@@ -113,7 +113,32 @@ export async function signup(formData: FormData) {
 
 export async function signOut() {
     const supabase = await createClient();
+
+    // Get user role before signing out
+    const { data: { user } } = await supabase.auth.getUser();
+    let redirectPath = "/start/buyer"; // Default to buyer
+
+    if (user) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        const roles = Array.isArray(profile?.role) ? profile.role : [profile?.role || ""];
+
+        // Redirect based on role priority
+        if (roles.includes('supplier')) {
+            redirectPath = "/start/supplier";
+        } else if (roles.includes('admin')) {
+            redirectPath = "/admin/login";
+        } else {
+            redirectPath = "/start/buyer";
+        }
+    }
+
     await supabase.auth.signOut();
     revalidatePath("/");
-    redirect("/start/supplier");
+    redirect(redirectPath);
 }
+

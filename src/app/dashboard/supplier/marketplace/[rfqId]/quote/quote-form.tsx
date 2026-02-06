@@ -56,48 +56,177 @@ export default function QuoteForm({ rfq, costBreakdownEnabled }: { rfq: any; cos
                     </div>
 
                     {/* RFQ Summary Card */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
-                        <h3 className="font-bold text-gray-900 text-lg border-b pb-3">RFQ Details</h3>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+                        <h3 className="font-bold text-gray-900 text-lg border-b pb-3 sticky top-0 bg-white z-10">RFQ Details</h3>
 
-                        <div className="space-y-3">
-                            <div>
-                                <p className="text-xs text-gray-500 font-medium">RFQ Number</p>
-                                <p className="text-sm font-bold text-gray-900">{rfq.rfq_number}</p>
-                            </div>
-
-                            <div>
-                                <p className="text-xs text-gray-500 font-medium">Material / Part</p>
-                                <p className="text-sm font-bold text-gray-900">{rfq.file_name}</p>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-4">
+                            {/* Basic Info */}
+                            <div className="space-y-3">
                                 <div>
-                                    <p className="text-xs text-gray-500 font-medium">Quantity</p>
-                                    <p className="text-sm font-bold text-gray-900">{rfq.quantity}</p>
+                                    <p className="text-xs text-gray-500 font-medium">RFQ Number</p>
+                                    <p className="text-sm font-bold text-gray-900">{rfq.rfq_number}</p>
                                 </div>
+
+                                {rfq.part_name && (
+                                    <div>
+                                        <p className="text-xs text-gray-500 font-medium">Part Name</p>
+                                        <p className="text-sm font-bold text-blue-700">{rfq.part_name}</p>
+                                    </div>
+                                )}
+
                                 <div>
-                                    <p className="text-xs text-gray-500 font-medium">Lead Time</p>
-                                    <p className="text-sm font-bold text-gray-900">
-                                        {rfq.lead_time ? new Date(rfq.lead_time).toLocaleDateString() : "N/A"}
-                                    </p>
+                                    <p className="text-xs text-gray-500 font-medium">Drawing / File</p>
+                                    <p className="text-sm font-bold text-gray-900">{rfq.file_name}</p>
                                 </div>
                             </div>
 
-                            {rfq.type && (
-                                <div>
-                                    <p className="text-xs text-gray-500 font-medium">Type</p>
-                                    <p className="text-sm font-bold text-gray-900">{rfq.type}</p>
+                            {/* Specifications Section */}
+                            {(rfq.material_size || rfq.miet_weight || rfq.sample_quantity || rfq.sample_lead_time || rfq.total_process || rfq.material_admin || rfq.finish || rfq.hardness) && (
+                                <div className="pt-3 border-t border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-3">📐 Specifications</p>
+                                    <div className="space-y-2">
+                                        {rfq.material_size && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Material Size</p>
+                                                <p className="text-xs font-bold text-gray-900">{rfq.material_size}</p>
+                                            </div>
+                                        )}
+                                        {rfq.miet_weight && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Miet Weight</p>
+                                                <p className="text-xs font-bold text-gray-900">{rfq.miet_weight} kg</p>
+                                            </div>
+                                        )}
+                                        {rfq.sample_quantity && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Sample Qty</p>
+                                                <p className="text-xs font-bold text-gray-900">{rfq.sample_quantity}</p>
+                                            </div>
+                                        )}
+                                        {rfq.sample_lead_time && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Sample Lead Time</p>
+                                                <p className="text-xs font-bold text-gray-900">{rfq.sample_lead_time}</p>
+                                            </div>
+                                        )}
+                                        {rfq.total_process && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Total Process</p>
+                                                <p className="text-xs font-bold text-gray-900">{rfq.total_process}</p>
+                                            </div>
+                                        )}
+                                        {rfq.material_admin && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Material</p>
+                                                <p className="text-xs font-bold text-gray-900">{rfq.material_admin}</p>
+                                            </div>
+                                        )}
+                                        {rfq.finish && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Surface Finishing</p>
+                                                <p className="text-xs font-bold text-gray-900">{rfq.finish}</p>
+                                            </div>
+                                        )}
+                                        {rfq.hardness && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Hardness</p>
+                                                <p className="text-xs font-bold text-gray-900">{rfq.hardness}</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
-                            {/* Drawing/Image Placeholder */}
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                                <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                                <p className="text-xs text-gray-500">Drawing/Image</p>
-                                <button className="text-xs text-blue-600 hover:underline mt-1">
-                                    Click to view
-                                </button>
-                            </div>
+                            {/* Pricing & Timeline */}
+                            {(rfq.target_price || rfq.lead_time_admin) && (
+                                <div className="pt-3 border-t border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-3">💰 Pricing & Timeline</p>
+                                    <div className="space-y-2">
+                                        {rfq.target_price && (
+                                            <div className="flex justify-between items-center bg-blue-50 p-2 rounded">
+                                                <p className="text-xs text-gray-600">Target Price</p>
+                                                <p className="text-sm font-bold text-blue-700">₹{rfq.target_price} / piece</p>
+                                            </div>
+                                        )}
+                                        {rfq.lead_time_admin && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Lead Time</p>
+                                                <p className="text-xs font-bold text-gray-900">{rfq.lead_time_admin}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Production Details */}
+                            {(rfq.production_remarks || rfq.job_warnings) && (
+                                <div className="pt-3 border-t border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-3">🏭 Production Details</p>
+                                    <div className="space-y-2">
+                                        {rfq.production_remarks && (
+                                            <div className="bg-gray-50 p-2 rounded">
+                                                <p className="text-xs text-gray-500 mb-1">Remarks</p>
+                                                <p className="text-xs text-gray-900">{rfq.production_remarks}</p>
+                                            </div>
+                                        )}
+                                        {rfq.job_warnings && (
+                                            <div className="bg-red-50 p-2 rounded border border-red-200">
+                                                <p className="text-xs text-red-600 font-bold mb-1">⚠ Warnings</p>
+                                                <p className="text-xs text-red-900">{rfq.job_warnings}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Future Demand */}
+                            {(rfq.future_demand_date || rfq.future_demand_frequency) && (
+                                <div className="pt-3 border-t border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-3">📅 Future Demand</p>
+                                    <div className="space-y-2">
+                                        {rfq.future_demand_date && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Date</p>
+                                                <p className="text-xs font-bold text-gray-900">{new Date(rfq.future_demand_date).toLocaleDateString()}</p>
+                                            </div>
+                                        )}
+                                        {rfq.future_demand_frequency && (
+                                            <div className="bg-green-50 p-2 rounded">
+                                                <p className="text-xs text-gray-500 mb-1">Frequency</p>
+                                                <p className="text-xs font-bold text-green-700">{rfq.future_demand_frequency.join(', ')}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Admin Notes */}
+                            {rfq.admin_notes && (
+                                <div className="pt-3 border-t border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">📝 Important Notes</p>
+                                    <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
+                                        <p className="text-xs text-gray-900">{rfq.admin_notes}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Drawing/Image */}
+                            {rfq.file_url && (
+                                <div className="pt-3 border-t border-gray-100">
+                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                                        <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                                        <p className="text-xs text-gray-500 mb-2">Technical Drawing</p>
+                                        <a
+                                            href={rfq.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-blue-600 hover:underline font-medium"
+                                        >
+                                            Click to view/download
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

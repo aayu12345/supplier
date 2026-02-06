@@ -1,7 +1,7 @@
 "use client";
 
 import { Bell, Search, Upload, LogOut, LogIn, User, Settings, ChevronDown } from "lucide-react";
-import { signOut } from "@/app/auth/actions";
+import { signOut } from "@/app/dashboard/buyer/actions";
 import Link from "next/link";
 import { useState } from "react";
 
