@@ -47,62 +47,162 @@ export async function signOutAdmin() {
     redirect("/admin/login");
 }
 
-export async function createSubRFQ(parentId: string, itemData: any, parentRfqNumber: string) {
-    const supabase = await createClient();
-
+// Updated createSubRFQ to handle FormData and File Uploads
+export async function createSubRFQ(formData: FormData) {
     try {
-        // 1. Fetch Parent Logic (Optional validation, but ID is passed)
-        // 2. Generate Sub-RFQ Number by counting existing children
-        const { count } = await supabase
+        const supabase = await createClient();
+
+        // Validate required fields
+        const parentId = formData.get("parentId") as string;
+        const parentRfqNumber = formData.get("parentRfqNumber") as string;
+        const userId = formData.get("userId") as string;
+        const partName = formData.get("partName") as string;
+
+        if (!parentId || !parentRfqNumber || !userId || !partName) {
+            return { error: "Missing required fields (Parent ID, RFQ Number, User ID, Part Name)" };
+        }
+
+        // Basic Form Fields
+        const notes = formData.get("notes") as string;
+        const drawingFile = formData.get("drawing") as File | null;
+        const rfqType = formData.get("rfqType") as string || 'single';
+
+        // Specifications Section
+        const materialSize = formData.get("materialSize") as string;
+        const mietWeight = formData.get("mietWeight") as string;
+        const sampleQty = formData.get("sampleQty") as string;
+        const sampleLeadTime = formData.get("sampleLeadTime") as string;
+        const totalProcess = formData.get("totalProcess") as string;
+        const material = formData.get("material") as string;
+        const surfaceFinishing = formData.get("surfaceFinishing") as string;
+        const hardness = formData.get("hardness") as string;
+
+        // Pricing
+        const targetPrice = formData.get("targetPrice") as string;
+
+        // Production Details
+        const productionRemarks = formData.get("productionRemarks") as string;
+        const jobWarnings = formData.get("jobWarnings") as string;
+
+        // Future Demand
+        const futureWeek = formData.get("futureWeek") as string;
+        const demandFreqValues = formData.getAll("demandFreq") as string[];
+        const demandFrequency = demandFreqValues.length > 0 ? demandFreqValues : null;
+
+        // Validate file size (25MB max)
+        if (drawingFile && drawingFile.size > 25 * 1024 * 1024) {
+            return { error: "File size exceeds 25MB limit" };
+        }
+
+        // 1. Generate Sub-RFQ Number
+        const { count, error: countError } = await supabase
             .from("rfqs")
             .select("*", { count: 'exact', head: true })
             .eq("parent_rfq_id", parentId);
 
+        if (countError) {
+            console.error("Count error:", countError);
+            return { error: "Failed to generate RFQ number" };
+        }
+
         const suffix = (count || 0) + 1;
         const subRfqNumber = `${parentRfqNumber}-${String(suffix).padStart(2, '0')}`;
 
-        // 3. Create Sub-RFQ
-        const { data: newRfq, error } = await supabase
+        // 2. Handle File Upload (if present)
+        let fileUrl = null;
+        let fileName = null;
+
+        if (drawingFile && drawingFile.size > 0) {
+            try {
+                const fileExt = drawingFile.name.split('.').pop();
+                fileName = drawingFile.name;
+                const filePath = `rfq-drawings/${subRfqNumber}-${Date.now()}.${fileExt}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from("rfq-drawings")
+                    .upload(filePath, drawingFile);
+
+                if (uploadError) {
+                    console.error("Upload error:", uploadError);
+                    return { error: `File upload failed: ${uploadError.message}` };
+                }
+
+                const { data: { publicUrl } } = supabase.storage.from("rfq-drawings").getPublicUrl(filePath);
+                fileUrl = publicUrl;
+            } catch (uploadErr: any) {
+                console.error("File upload exception:", uploadErr);
+                return { error: "File upload failed. Please try again." };
+            }
+        }
+
+        // 3. Create Sub-RFQ with all detailed fields
+        const { data: newRfq, error: insertError } = await supabase
             .from("rfqs")
             .insert({
                 parent_rfq_id: parentId,
                 rfq_number: subRfqNumber,
-                user_id: itemData.user_id, // Same buyer
-                status: 'Draft', // Internal status (not admin_status, wait... check schema) 
-                // Using admin_status for workflow based on previous file analysis
+                user_id: userId,
+                status: 'Draft',
                 admin_status: 'Draft',
 
-                // Item Specifics
-                file_url: itemData.file_url,
-                file_name: itemData.file_name,
-                drawing_number: itemData.drawing_number,
-                quantity: itemData.quantity,
-                target_price: itemData.target_price,
-                lead_time: itemData.lead_time,
+                // Basic Info
+                part_name: partName,
+                type: rfqType,
+                admin_notes: notes || null,
 
-                // Inherited/Default
-                type: 'single', // Sub-RFQ is logically single item
+                // File
+                file_url: fileUrl,
+                file_name: fileName,
+
+                // Specifications
+                material_size: materialSize || null,
+                miet_weight: mietWeight ? parseFloat(mietWeight) : null,
+                sample_quantity: sampleQty ? parseInt(sampleQty) : null,
+                sample_lead_time: sampleLeadTime || null,
+                total_process: totalProcess || null,
+                material_admin: material || null,
+                finish: surfaceFinishing || null,
+                hardness: hardness || null,
+
+                // Pricing
+                target_price: targetPrice ? parseFloat(targetPrice) : null,
+
+                // Production
+                production_remarks: productionRemarks || null,
+                job_warnings: jobWarnings || null,
+
+                // Future Demand
+                future_demand_date: futureWeek ? new Date(futureWeek).toISOString() : null,
+                future_demand_frequency: demandFrequency,
+
                 created_at: new Date().toISOString()
             })
             .select()
             .single();
 
-        if (error) throw error;
+        if (insertError) {
+            console.error("Insert error:", insertError);
+            return { error: `Failed to create Sub-RFQ: ${insertError.message}` };
+        }
 
         // 4. Update Parent Status
-        await supabase
+        const { error: updateError } = await supabase
             .from("rfqs")
             .update({ admin_status: 'Drafts Created' })
             .eq("id", parentId)
-            // Only update if currently New
             .eq("admin_status", "New");
+
+        if (updateError) {
+            console.error("Parent update error:", updateError);
+            // Don't fail the whole operation if parent update fails
+        }
 
         revalidatePath(`/admin/buyers/rfqs/${parentId}`);
         return { success: true, newId: newRfq.id };
 
     } catch (error: any) {
         console.error("Create Sub-RFQ Error:", error);
-        return { error: error.message };
+        return { error: error?.message || "An unexpected error occurred" };
     }
 }
 

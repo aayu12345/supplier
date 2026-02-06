@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Download, Save, CheckCircle, CheckCircle2, AlertCircle, ShoppingCart, MessageSquare, Send } from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
+import CreateSubRFQModal from "@/components/admin/CreateSubRFQModal";
 
 // Types matching DB
 type AdminRFQDetail = {
@@ -72,6 +73,10 @@ export default function AdminRFQDetailPage() {
     const [subRfqs, setSubRfqs] = useState<any[]>([]);
     const [rfqItems, setRfqItems] = useState<any[]>([]);
     const [isParent, setIsParent] = useState(false);
+
+    // Modal State
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedItem, setSelectedItem] = useState<any>(null);
 
     // Existing State
     const [quotes, setQuotes] = useState<SupplierQuote[]>([]);
@@ -159,11 +164,29 @@ export default function AdminRFQDetailPage() {
                 if (negData) setNegotiations(negData);
             }
 
-            // Pre-fill Forms (Existing Logic)
+            // Pre-fill Forms with ALL saved data
             if (rfqData) {
+                // Basic fields
                 setValueLive("weight_per_piece", rfqData.weight_per_piece || 0);
-                // ... rest of pre-fill
+                setValueLive("material_admin", rfqData.material_admin || "");
+                setValueLive("finish", rfqData.finish || "");
+                setValueLive("hardness", rfqData.hardness || "");
+                setValueLive("lead_time_admin", rfqData.lead_time_admin || "");
+                setValueLive("admin_notes", rfqData.admin_notes || "");
+
+                // New detailed fields
+                setValueLive("part_name", (rfqData as any).part_name || "");
+                setValueLive("material_size", (rfqData as any).material_size || "");
+                setValueLive("miet_weight", (rfqData as any).miet_weight || "");
+                setValueLive("sample_quantity", (rfqData as any).sample_quantity || "");
+                setValueLive("sample_lead_time", (rfqData as any).sample_lead_time || "");
+                setValueLive("total_process", (rfqData as any).total_process || "");
+                setValueLive("target_price", rfqData.target_price || "");
+                setValueLive("production_remarks", (rfqData as any).production_remarks || "");
+                setValueLive("job_warnings", (rfqData as any).job_warnings || "");
+                setValueLive("future_demand_date", (rfqData as any).future_demand_date ? new Date((rfqData as any).future_demand_date).toISOString().split('T')[0] : "");
             }
+
 
         } catch (error) {
             console.error("Error fetching data:", error);
@@ -172,24 +195,9 @@ export default function AdminRFQDetailPage() {
         }
     };
 
-    const handleCreateSubRfq = async (item: any) => {
-        if (!confirm(`Create Sub-RFQ for Item: ${item.drawing_number}?`)) return;
-        setSaving(true);
-        try {
-            const { createSubRFQ } = await import("@/app/admin/actions");
-            const result = await createSubRFQ(rfq!.id, {
-                ...item,
-                user_id: rfq!.user_id
-            }, rfq!.rfq_number);
-
-            if (result.error) throw new Error(result.error);
-            alert("Sub-RFQ Created!");
-            fetchData();
-        } catch (e: any) {
-            alert(e.message);
-        } finally {
-            setSaving(false);
-        }
+    const handleCreateSubRfq = (item: any) => {
+        setSelectedItem(item);
+        setIsModalOpen(true);
     };
 
     // --- Actions ---
@@ -205,6 +213,8 @@ export default function AdminRFQDetailPage() {
                 .from("rfqs")
                 .update({
                     admin_status: 'Live',
+
+                    // Basic fields
                     weight_per_piece: formData.weight_per_piece,
                     material_admin: formData.material_admin,
                     finish: formData.finish,
@@ -212,6 +222,18 @@ export default function AdminRFQDetailPage() {
                     lead_time_admin: formData.lead_time_admin,
                     admin_notes: formData.admin_notes,
                     visibility_expires_at: expiresAt.toISOString(),
+
+                    // Detailed fields
+                    part_name: formData.part_name,
+                    material_size: formData.material_size,
+                    miet_weight: formData.miet_weight ? parseFloat(formData.miet_weight) : null,
+                    sample_quantity: formData.sample_quantity ? parseInt(formData.sample_quantity) : null,
+                    sample_lead_time: formData.sample_lead_time,
+                    total_process: formData.total_process,
+                    target_price: formData.target_price ? parseFloat(formData.target_price) : null,
+                    production_remarks: formData.production_remarks,
+                    job_warnings: formData.job_warnings,
+                    future_demand_date: formData.future_demand_date ? new Date(formData.future_demand_date).toISOString() : null,
                 })
                 .eq("id", rfq.id);
 
@@ -433,6 +455,25 @@ export default function AdminRFQDetailPage() {
                     </div>
                 </div>
 
+                {/* Sub-RFQ Creation Modal */}
+                {selectedItem && (
+                    <CreateSubRFQModal
+                        isOpen={isModalOpen}
+                        onClose={() => {
+                            setIsModalOpen(false);
+                            setSelectedItem(null);
+                            // Refresh list if needed or rely on parent re-render? 
+                            // Re-fetching handled within page effect or we trigger fetchData() here?
+                            // Modal calls action which revalidates path, so router refresh might be needed or just re-fetch.
+                            fetchData();
+                        }}
+                        parentId={rfq.id}
+                        parentRfqNumber={rfq.rfq_number}
+                        userId={rfq.user_id}
+                        itemData={selectedItem}
+                    />
+                )}
+
                 {/* Section B: Created Sub-RFQs */}
                 <div className="bg-white rounded-xl shadow-sm border p-6">
                     <h2 className="text-lg font-bold mb-4">Active Sub-RFQs</h2>
@@ -516,10 +557,60 @@ export default function AdminRFQDetailPage() {
                             <Download className="h-4 w-4" /> Specs
                         </h3>
                         <div className="space-y-3 text-sm">
+                            {/* Basic Info */}
                             <p><span className="text-gray-500">File:</span> {rfq.file_name}</p>
-                            <p><span className="text-gray-500">Qty:</span> {rfq.quantity}</p>
-                            <p><span className="text-gray-500">Material:</span> {rfq.material_admin || "Pending"}</p>
-                            <p><span className="text-gray-500">Weight:</span> {rfq.weight_per_piece} kg</p>
+                            {(rfq as any).part_name && <p><span className="text-gray-500 font-semibold">Part Name:</span> <span className="font-medium text-gray-900">{(rfq as any).part_name}</span></p>}
+
+                            {/* Specifications */}
+                            {(rfq as any).material_size && (
+                                <div className="pt-2 border-t border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">Specifications</p>
+                                    <p><span className="text-gray-500">Material Size:</span> {(rfq as any).material_size}</p>
+                                </div>
+                            )}
+                            {(rfq as any).miet_weight && <p><span className="text-gray-500">Miet Weight:</span> {(rfq as any).miet_weight} kg</p>}
+                            {(rfq as any).sample_quantity && <p><span className="text-gray-500">Sample Qty:</span> {(rfq as any).sample_quantity}</p>}
+                            {(rfq as any).sample_lead_time && <p><span className="text-gray-500">Sample Lead Time:</span> {(rfq as any).sample_lead_time}</p>}
+                            {(rfq as any).total_process && <p><span className="text-gray-500">Total Process:</span> {(rfq as any).total_process}</p>}
+                            {rfq.material_admin && <p><span className="text-gray-500">Material:</span> {rfq.material_admin}</p>}
+                            {rfq.finish && <p><span className="text-gray-500">Surface Finishing:</span> {rfq.finish}</p>}
+                            {rfq.hardness && <p><span className="text-gray-500">Hardness:</span> {rfq.hardness}</p>}
+
+                            {/* Pricing */}
+                            {rfq.target_price && (
+                                <div className="pt-2 border-t border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">Pricing</p>
+                                    <p><span className="text-gray-500">Target Price:</span> <span className="font-bold text-blue-700">₹{rfq.target_price}</span> per piece</p>
+                                </div>
+                            )}
+
+                            {/* Production Details */}
+                            {((rfq as any).production_remarks || (rfq as any).job_warnings) && (
+                                <div className="pt-2 border-t border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">Production</p>
+                                    {(rfq as any).production_remarks && <p><span className="text-gray-500">Remarks:</span> {(rfq as any).production_remarks}</p>}
+                                    {(rfq as any).job_warnings && <p><span className="text-red-600 font-medium">⚠ Warnings:</span> {(rfq as any).job_warnings}</p>}
+                                </div>
+                            )}
+
+                            {/* Future Demand */}
+                            {((rfq as any).future_demand_date || (rfq as any).future_demand_frequency) && (
+                                <div className="pt-2 border-t border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">Future Demand</p>
+                                    {(rfq as any).future_demand_date && <p><span className="text-gray-500">Date:</span> {new Date((rfq as any).future_demand_date).toLocaleDateString()}</p>}
+                                    {(rfq as any).future_demand_frequency && (
+                                        <p><span className="text-gray-500">Frequency:</span> {(rfq as any).future_demand_frequency.join(', ')}</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Notes */}
+                            {rfq.admin_notes && (
+                                <div className="pt-2 border-t border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase mb-2">Critical Notes</p>
+                                    <p className="text-gray-700 bg-yellow-50 p-2 rounded text-xs">{rfq.admin_notes}</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -529,19 +620,74 @@ export default function AdminRFQDetailPage() {
 
                     {/* STATE: NEW -> LIVE FORM */}
                     {(rfq.admin_status === 'New' || rfq.admin_status === 'Draft') && (
-                        <div className="bg-white p-8 rounded-xl border border-blue-100 shadow-sm ring-4 ring-blue-50">
-                            <h2 className="text-lg font-bold mb-6">Step 1: Validate & Make Live (Publish)</h2>
-                            <form onSubmit={handleSubmitLive(onSubmitLive)} className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <input {...registerLive("weight_per_piece")} placeholder="Weight (kg)" className="input-field" type="number" step="0.001" />
-                                    <input {...registerLive("material_admin")} placeholder="Refined Material" className="input-field" />
-                                    <input {...registerLive("finish")} placeholder="Finish" className="input-field" />
-                                    <input {...registerLive("lead_time_admin")} placeholder="Std Lead Time" className="input-field" />
-                                    <input {...registerLive("visibility_days")} placeholder="Days Visible (e.g. 3)" className="input-field" type="number" defaultValue={3} />
-                                    <input {...registerLive("admin_notes")} placeholder="Notes for Supplier" className="input-field" />
+                        <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm ring-4 ring-blue-50">
+                            <h2 className="text-lg font-bold mb-6 text-blue-900">Step 1: Validate & Make Live (Publish)</h2>
+                            <form onSubmit={handleSubmitLive(onSubmitLive)} className="space-y-6">
+
+                                {/* Basic Info */}
+                                <div className="space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-blue-600 pl-3">Basic Information</h3>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input {...registerLive("part_name")} placeholder="Part Name" className="input-field text-sm" />
+                                        <input {...registerLive("weight_per_piece")} placeholder="Weight (kg)" className="input-field text-sm" type="number" step="0.001" />
+                                    </div>
                                 </div>
-                                <button type="submit" disabled={saving} className="btn-primary w-full">
-                                    {saving ? "Saving..." : "Make Live to Suppliers"}
+
+                                {/* Specifications */}
+                                <div className="space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-green-600 pl-3">Specifications</h3>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input {...registerLive("material_size")} placeholder="Material Size (e.g. 20x2x100 mm)" className="input-field text-sm" />
+                                        <input {...registerLive("miet_weight")} placeholder="Miet Weight (kg)" className="input-field text-sm" type="number" step="0.01" />
+                                        <input {...registerLive("sample_quantity")} placeholder="Sample Qty" className="input-field text-sm" type="number" />
+                                        <input {...registerLive("sample_lead_time")} placeholder="Sample Lead Time" className="input-field text-sm" />
+                                        <input {...registerLive("total_process")} placeholder="Total Process" className="input-field text-sm" />
+                                        <input {...registerLive("material_admin")} placeholder="Material" className="input-field text-sm" />
+                                        <input {...registerLive("finish")} placeholder="Surface Finishing" className="input-field text-sm" />
+                                        <input {...registerLive("hardness")} placeholder="Hardness" className="input-field text-sm" />
+                                    </div>
+                                </div>
+
+                                {/* Pricing & Lead Time */}
+                                <div className="space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-purple-600 pl-3">Pricing & Timeline</h3>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input {...registerLive("target_price")} placeholder="Target Price (₹ per piece)" className="input-field text-sm" type="number" step="0.01" />
+                                        <input {...registerLive("lead_time_admin")} placeholder="Standard Lead Time" className="input-field text-sm" />
+                                    </div>
+                                </div>
+
+                                {/* Production Details */}
+                                <div className="space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-orange-600 pl-3">Production Details</h3>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        <input {...registerLive("production_remarks")} placeholder="Production Remarks" className="input-field text-sm" />
+                                        <input {...registerLive("job_warnings")} placeholder="Job Warnings" className="input-field text-sm bg-red-50 border-red-200" />
+                                    </div>
+                                </div>
+
+                                {/* Future Demand */}
+                                <div className="space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-indigo-600 pl-3">Future Demand</h3>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input {...registerLive("future_demand_date")} placeholder="Future Demand Date" className="input-field text-sm" type="date" />
+                                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                                            <span className="text-xs">Frequency saved in draft</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Publishing Settings */}
+                                <div className="space-y-3 pt-4 border-t border-gray-200">
+                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-yellow-600 pl-3">Publishing Settings</h3>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input {...registerLive("visibility_days")} placeholder="Days Visible (e.g. 3)" className="input-field text-sm" type="number" defaultValue={3} />
+                                        <input {...registerLive("admin_notes")} placeholder="Notes for Supplier" className="input-field text-sm bg-yellow-50" />
+                                    </div>
+                                </div>
+
+                                <button type="submit" disabled={saving} className="btn-primary w-full py-3 text-base font-bold">
+                                    {saving ? "Publishing..." : "✓ Make Live to Suppliers"}
                                 </button>
                             </form>
                         </div>
