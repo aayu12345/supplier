@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
         const formData = await request.formData();
         const file = formData.get('file') as File;
         const docType = formData.get('docType') as string;
+        const expiryDate = formData.get('expiryDate') as string; // New field
 
         if (!file || !docType) {
             return NextResponse.json({ error: "Missing file or document type" }, { status: 400 });
@@ -30,8 +31,17 @@ export async function POST(request: NextRequest) {
             });
 
         if (uploadError) {
-            console.error('Upload error:', uploadError);
-            return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+            console.error('Upload error details:', {
+                message: uploadError.message,
+                statusCode: uploadError.statusCode,
+                error: uploadError,
+                fileName: fileName,
+                bucket: 'supplier-documents'
+            });
+            return NextResponse.json({
+                error: "Upload failed",
+                details: uploadError.message
+            }, { status: 500 });
         }
 
         // Get public URL
@@ -39,7 +49,46 @@ export async function POST(request: NextRequest) {
             .from('supplier-documents')
             .getPublicUrl(fileName);
 
-        // Update profile with document metadata
+        // Map docType to document_type for supplier_documents table
+        const documentTypeMap: Record<string, string> = {
+            iso_certificate: "ISO Certificate",
+            msme_certificate: "MSME Certificate",
+            capabilities: "Company Capacities",
+            gst_certificate: "GST Certificate",
+            company_registration: "Company Registration",
+        };
+
+        const document_type = documentTypeMap[docType] || "Other";
+
+        // DEBUG: Log the user ID and document details
+        console.log('=== UPLOAD DEBUG ===');
+        console.log('User ID:', user.id);
+        console.log('Document Type:', document_type);
+        console.log('File Name:', file.name);
+        console.log('Expiry Date:', expiryDate);
+
+        // Save to supplier_documents table (so admin can see it)
+        const { data: insertedData, error: dbError } = await supabase
+            .from('supplier_documents')
+            .insert({
+                supplier_id: user.id,
+                document_type: document_type,
+                document_url: publicUrl,
+                document_name: file.name,
+                expiry_date: expiryDate || null, // Save expiry date
+                verification_status: 'Pending', // Set to Pending by default
+            })
+            .select();
+
+        console.log('Inserted Document:', insertedData);
+        console.log('Insert Error:', dbError);
+
+        if (dbError) {
+            console.error('Database error:', dbError);
+            return NextResponse.json({ error: "Failed to save document record" }, { status: 500 });
+        }
+
+        // ALSO update profiles.documents for backward compatibility
         const { data: profile } = await supabase
             .from('profiles')
             .select('documents')
@@ -50,18 +99,14 @@ export async function POST(request: NextRequest) {
         documents[docType] = {
             url: publicUrl,
             status: 'Pending',
-            uploaded_at: new Date().toISOString()
+            uploaded_at: new Date().toISOString(),
+            expiry_date: expiryDate || null,
         };
 
-        const { error: updateError } = await supabase
+        await supabase
             .from('profiles')
             .update({ documents })
             .eq('id', user.id);
-
-        if (updateError) {
-            console.error('Update error:', updateError);
-            return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
-        }
 
         return NextResponse.json({ success: true, url: publicUrl });
     } catch (error) {

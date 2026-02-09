@@ -19,7 +19,7 @@ function SubmitButton() {
     );
 }
 
-export default function ProfileView({ profile, metrics }: { profile: any, metrics: any }) {
+export default function ProfileView({ profile, metrics, documentStatus }: { profile: any, metrics: any, documentStatus: Record<string, any> }) {
     const [state, formAction] = useActionState(updateSupplierProfile, null);
 
     // Bank Details Helper
@@ -124,9 +124,9 @@ export default function ProfileView({ profile, metrics }: { profile: any, metric
                         </h3>
                     </div>
                     <div className="p-6 space-y-4">
-                        <DocRow label="ISO Certification" status={docs.iso_certificate?.status || "Pending"} docType="iso_certificate" />
-                        <DocRow label="MSME Certificate" status={docs.msme_certificate?.status || "Pending"} docType="msme_certificate" />
-                        <DocRow label="Company Capacities" status={docs.capabilities?.status || "Pending"} docType="capabilities" />
+                        <DocRow label="ISO Certification" status={documentStatus.iso_certificate?.status || "Not Uploaded"} docType="iso_certificate" adminNotes={documentStatus.iso_certificate?.notes} />
+                        <DocRow label="MSME Certificate" status={documentStatus.msme_certificate?.status || "Not Uploaded"} docType="msme_certificate" adminNotes={documentStatus.msme_certificate?.notes} />
+                        <DocRow label="Company Capacities" status={documentStatus.company_capacities?.status || "Not Uploaded"} docType="capabilities" adminNotes={documentStatus.company_capacities?.notes} />
                     </div>
                 </div>
             </div>
@@ -197,19 +197,38 @@ function ScoreRow({ label, score, color }: { label: string, score: number, color
     );
 }
 
-function DocRow({ label, status, docType }: { label: string, status: string, docType: string }) {
-    const isApproved = status === "Approved";
+function DocRow({ label, status, docType, adminNotes }: { label: string, status: string, docType: string, adminNotes?: string }) {
     const [uploading, setUploading] = useState(false);
+    const [showModal, setShowModal] = useState(false);
+    const [expiryDate, setExpiryDate] = useState('');
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Determine verification status
+    const verificationStatus = status || 'Not Uploaded';
+    const isVerified = verificationStatus === 'Verified';
+    const isPending = verificationStatus === 'Pending';
+    const isRejected = verificationStatus === 'Rejected';
+    const isNotUploaded = verificationStatus === 'Not Uploaded';
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (file) {
+            setSelectedFile(file);
+            setShowModal(true);
+        }
+    };
+
+    const handleUpload = async () => {
+        if (!selectedFile) return;
 
         setUploading(true);
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', selectedFile);
         formData.append('docType', docType);
+        if (expiryDate) {
+            formData.append('expiryDate', expiryDate);
+        }
 
         try {
             const response = await fetch('/api/upload-document', {
@@ -217,54 +236,132 @@ function DocRow({ label, status, docType }: { label: string, status: string, doc
                 body: formData,
             });
 
+            const result = await response.json();
+            console.log('Upload response:', result);
+
             if (response.ok) {
                 alert('Document uploaded successfully! Admin will review it.');
+                setShowModal(false);
                 window.location.reload();
             } else {
-                alert('Upload failed. Please try again.');
+                console.error('Upload failed:', result);
+                alert(`Upload failed: ${result.details || result.error || 'Unknown error'}`);
             }
         } catch (error) {
-            alert('Upload error. Please try again.');
+            console.error('Upload error:', error);
+            alert('Upload error. Please check console for details.');
         } finally {
             setUploading(false);
         }
     };
 
+    // Status badge styling
+    const getStatusBadge = () => {
+        if (isVerified) {
+            return <span className="px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700">✓ Verified</span>;
+        } else if (isPending) {
+            return <span className="px-2 py-0.5 rounded text-xs font-bold bg-yellow-100 text-yellow-700">⏳ Pending</span>;
+        } else if (isRejected) {
+            return <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700">✗ Rejected</span>;
+        } else {
+            return <span className="px-2 py-0.5 rounded text-xs font-bold bg-gray-100 text-gray-600">Upload Required</span>;
+        }
+    };
+
     return (
-        <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors bg-white">
-            <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${isApproved ? "bg-green-50 text-green-600" : "bg-gray-50 text-gray-400"}`}>
-                    <FileText className="h-4 w-4" />
+        <>
+            <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors bg-white">
+                <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${isVerified ? "bg-green-50 text-green-600" : isPending ? "bg-yellow-50 text-yellow-600" : isRejected ? "bg-red-50 text-red-600" : "bg-gray-50 text-gray-400"}`}>
+                        <FileText className="h-4 w-4" />
+                    </div>
+                    <div>
+                        <span className="text-sm font-medium text-gray-900 block">{label}</span>
+                        {isRejected && adminNotes && (
+                            <span className="text-xs text-red-600">Admin: {adminNotes}</span>
+                        )}
+                        {isRejected && !adminNotes && (
+                            <span className="text-xs text-red-600">Admin: Please re-upload correct document</span>
+                        )}
+                    </div>
                 </div>
-                <span className="text-sm font-medium text-gray-900">{label}</span>
+
+                <div className="flex items-center gap-3">
+                    {getStatusBadge()}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        title={isVerified ? "Re-upload Document" : "Upload Document"}
+                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                    >
+                        {uploading ? (
+                            <div className="h-4 w-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+                        ) : (
+                            <Upload className="h-4 w-4" />
+                        )}
+                    </button>
+                </div>
             </div>
 
-            <div className="flex items-center gap-3">
-                <span className={`px-2 py-0.5 rounded text-xs font-bold ${isApproved ? "bg-green-100 text-green-700" : "bg-blue-50 text-blue-600"}`}>
-                    {status}
-                </span>
-                <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleFileChange}
-                    className="hidden"
-                />
-                <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    title="Upload Document"
-                    className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                >
-                    {uploading ? (
-                        <div className="h-4 w-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
-                    ) : (
-                        <Upload className="h-4 w-4" />
-                    )}
-                </button>
-            </div>
-        </div>
+            {/* Upload Modal */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Upload {label}</h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Selected File
+                                </label>
+                                <p className="text-sm text-gray-600">{selectedFile?.name}</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Expiry Date (Optional)
+                                </label>
+                                <input
+                                    type="date"
+                                    value={expiryDate}
+                                    onChange={(e) => setExpiryDate(e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => {
+                                    setShowModal(false);
+                                    setSelectedFile(null);
+                                    setExpiryDate('');
+                                }}
+                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                                disabled={uploading}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleUpload}
+                                disabled={uploading}
+                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {uploading ? 'Uploading...' : 'Upload'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 }
 

@@ -70,6 +70,15 @@ export default function SupplierDetailPage() {
     const supabase = createClient();
 
     useEffect(() => {
+        // CRITICAL FIX: Clear all state when switching suppliers
+        setSupplier(null);
+        setDocuments([]);
+        setQuotes([]);
+        setAdminNotes("");
+        setCapabilities([]);
+        setTrustScore(0);
+
+        // Then fetch new data
         fetchSupplierData();
     }, [supplierId]);
 
@@ -89,11 +98,11 @@ export default function SupplierDetailPage() {
             }
 
             // Fetch quotes history from existing supplier_quotes table
-            const { data: quotesData } = await supabase
+            const { data: quotesData, error: quotesError } = await supabase
                 .from("supplier_quotes")
                 .select(`
                     id,
-                    quoted_price,
+                    price,
                     status,
                     created_at,
                     rfq_id
@@ -101,7 +110,10 @@ export default function SupplierDetailPage() {
                 .eq("supplier_id", supplierId)
                 .order("created_at", { ascending: false });
 
-            if (quotesData) {
+            console.log("Quotes data:", quotesData);
+            console.log("Quotes error:", quotesError);
+
+            if (quotesData && quotesData.length > 0) {
                 // Fetch RFQ numbers for each quote
                 const quotesWithRFQ = await Promise.all(
                     quotesData.map(async (q: any) => {
@@ -115,12 +127,13 @@ export default function SupplierDetailPage() {
                             id: q.id,
                             rfq_id: q.rfq_id,
                             rfq_number: rfqData?.rfq_number || "N/A",
-                            quoted_price: q.quoted_price,
+                            quoted_price: q.price, // Map 'price' to 'quoted_price'
                             status: q.status,
                             created_at: q.created_at,
                         };
                     })
                 );
+                console.log("Quotes with RFQ:", quotesWithRFQ);
                 setQuotes(quotesWithRFQ);
             }
 
@@ -137,10 +150,28 @@ export default function SupplierDetailPage() {
 
             // Fetch documents from existing supplier_documents table
             // Note: existing table has document_type, document_url, document_name
-            const { data: docsData } = await supabase
+            console.log('=== ADMIN FETCHING DOCUMENTS ===');
+            console.log('Supplier ID from URL:', supplierId);
+            console.log('Supplier ID type:', typeof supplierId);
+            console.log('Supplier ID length:', supplierId?.length);
+
+            // Create a fresh Supabase client to avoid any caching issues
+            const freshSupabase = createClient();
+
+            const { data: docsData, error: docsError } = await freshSupabase
                 .from("supplier_documents")
                 .select("*")
                 .eq("supplier_id", supplierId);
+
+            console.log('Documents Query Error:', docsError);
+            console.log('Documents Fetched:', docsData);
+            console.log('Number of documents:', docsData?.length || 0);
+
+            // Log each document's supplier_id to verify
+            if (docsData && docsData.length > 0) {
+                console.log('Document supplier_ids:', docsData.map(d => d.supplier_id));
+                console.log('All match current supplier?', docsData.every(d => d.supplier_id === supplierId));
+            }
 
             if (docsData) {
                 // Map existing structure to our component's expected structure
@@ -150,6 +181,9 @@ export default function SupplierDetailPage() {
                         type: doc.document_type,
                         file_url: doc.document_url,
                         uploaded_at: doc.uploaded_at,
+                        expiry_date: doc.expiry_date,
+                        verification_status: doc.verification_status,
+                        admin_notes: doc.admin_notes,
                     }))
                 );
             }
@@ -323,81 +357,73 @@ export default function SupplierDetailPage() {
                                     <div className="bg-gray-50 p-4 rounded-lg">
                                         <label className="text-sm font-medium text-gray-600">Company Name</label>
                                         <p className="text-lg font-semibold text-gray-900 mt-1">
-                                            {supplier.company_name || "N/A"}
+                                            {supplier?.company_name || supplier?.name || "Not provided"}
+                                        </p>
+                                    </div>
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <label className="text-sm font-medium text-gray-600">Contact Person</label>
+                                        <p className="text-lg font-semibold text-gray-900 mt-1">
+                                            {supplier?.contact_person || supplier?.name || "Not provided"}
+                                        </p>
+                                    </div>
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <label className="text-sm font-medium text-gray-600">Email</label>
+                                        <p className="text-lg font-semibold text-gray-900 mt-1">
+                                            {supplier?.email || "Not provided"}
+                                        </p>
+                                    </div>
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <label className="text-sm font-medium text-gray-600">Phone</label>
+                                        <p className="text-lg font-semibold text-gray-900 mt-1">
+                                            {supplier?.phone || "Not provided"}
                                         </p>
                                     </div>
                                     <div className="bg-gray-50 p-4 rounded-lg">
                                         <label className="text-sm font-medium text-gray-600">GST Number</label>
                                         <p className="text-lg font-semibold text-gray-900 mt-1">
-                                            {supplier.gst_number || "N/A"}
+                                            {supplier?.gst_number || supplier?.gstin || "Not provided"}
                                         </p>
                                     </div>
                                     <div className="bg-gray-50 p-4 rounded-lg">
                                         <label className="text-sm font-medium text-gray-600">MSME Number</label>
                                         <p className="text-lg font-semibold text-gray-900 mt-1">
-                                            {supplier.msme_number || "N/A"}
+                                            {supplier?.msme_number || "Not provided"}
                                         </p>
                                     </div>
                                     <div className="bg-gray-50 p-4 rounded-lg">
                                         <label className="text-sm font-medium text-gray-600">City</label>
-                                        <p className="text-lg font-semibold text-gray-900 mt-1">{supplier.city}</p>
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
-                                        <label className="text-sm font-medium text-gray-600">Address</label>
                                         <p className="text-lg font-semibold text-gray-900 mt-1">
-                                            {supplier.address || "N/A"}
+                                            {supplier?.city || "Not provided"}
                                         </p>
                                     </div>
                                     <div className="bg-gray-50 p-4 rounded-lg">
                                         <label className="text-sm font-medium text-gray-600">Registered Since</label>
                                         <p className="text-lg font-semibold text-gray-900 mt-1">
-                                            {new Date(supplier.created_at).toLocaleDateString()}
+                                            {supplier?.created_at ? new Date(supplier.created_at).toLocaleDateString() : "Not available"}
+                                        </p>
+                                    </div>
+                                    <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
+                                        <label className="text-sm font-medium text-gray-600">Address</label>
+                                        <p className="text-lg font-semibold text-gray-900 mt-1">
+                                            {supplier?.address || "Not provided"}
                                         </p>
                                     </div>
                                 </div>
+
+                                {/* Show message if profile is incomplete */}
+                                {(!supplier?.company_name && !supplier?.gst_number && !supplier?.phone) && (
+                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                                        <p className="text-sm text-yellow-800">
+                                            ⚠️ This supplier hasn't completed their profile yet. Some information may be missing.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* Documents Tab */}
                         {activeTab === "documents" && (
-                            <div className="space-y-4">
-                                <h2 className="text-xl font-bold text-gray-900 mb-4">Uploaded Documents</h2>
-                                {documents.length === 0 ? (
-                                    <div className="text-center py-12">
-                                        <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                                        <p className="text-gray-500">No documents uploaded yet</p>
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {documents.map((doc) => (
-                                            <div
-                                                key={doc.id}
-                                                className="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <FileText className="h-8 w-8 text-blue-600" />
-                                                        <div>
-                                                            <p className="font-semibold text-gray-900">{doc.type}</p>
-                                                            <p className="text-xs text-gray-500">
-                                                                {new Date(doc.uploaded_at).toLocaleDateString()}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <a
-                                                        href={doc.file_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                                    >
-                                                        <Download className="h-4 w-4" />
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            <DocumentsTab documents={documents} supplierId={supplierId} />
                         )}
 
                         {/* Quoting History Tab */}
@@ -537,5 +563,205 @@ export default function SupplierDetailPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+// Documents Tab Component with Verification
+function DocumentsTab({ documents, supplierId }: { documents: any[], supplierId: string }) {
+    const [rejectModalOpen, setRejectModalOpen] = useState(false);
+    const [selectedDoc, setSelectedDoc] = useState<any>(null);
+    const [rejectNotes, setRejectNotes] = useState('');
+    const [processing, setProcessing] = useState(false);
+
+    // DEBUG: Log received documents
+    useEffect(() => {
+        console.log('=== DOCUMENTS TAB MOUNTED ===');
+        console.log('SupplierID:', supplierId);
+        console.log('Documents received:', documents);
+        console.log('Documents length:', documents?.length);
+    }, [documents, supplierId]);
+
+    const handleVerify = async (docId: string) => {
+        setProcessing(true);
+        const { verifyDocument } = await import('./document-actions');
+        const result = await verifyDocument(docId);
+
+        if (result.error) {
+            alert(result.error);
+        } else {
+            alert('Document verified successfully!');
+            window.location.reload();
+        }
+        setProcessing(false);
+    };
+
+    const handleRejectClick = (doc: any) => {
+        setSelectedDoc(doc);
+        setRejectModalOpen(true);
+    };
+
+    const handleRejectSubmit = async () => {
+        if (!rejectNotes.trim()) {
+            alert('Please provide a reason for rejection');
+            return;
+        }
+
+        setProcessing(true);
+        const { rejectDocument } = await import('./document-actions');
+        const result = await rejectDocument(selectedDoc.id, rejectNotes);
+
+        if (result.error) {
+            alert(result.error);
+        } else {
+            alert('Document rejected successfully!');
+            setRejectModalOpen(false);
+            setRejectNotes('');
+            window.location.reload();
+        }
+        setProcessing(false);
+    };
+
+    const getStatusBadge = (status: string) => {
+        if (status === 'Verified') {
+            return <span className="px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-700">✓ Verified</span>;
+        } else if (status === 'Pending') {
+            return <span className="px-2 py-1 rounded text-xs font-bold bg-yellow-100 text-yellow-700">⏳ Pending</span>;
+        } else if (status === 'Rejected') {
+            return <span className="px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-700">✗ Rejected</span>;
+        }
+        return <span className="px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600">No Status</span>;
+    };
+
+    const isExpiringSoon = (expiryDate: string) => {
+        if (!expiryDate) return false;
+        const expiry = new Date(expiryDate);
+        const today = new Date();
+        const daysUntilExpiry = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
+    };
+
+    return (
+        <>
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Uploaded Documents</h2>
+                {documents.length === 0 ? (
+                    <div className="text-center py-12">
+                        <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                        <p className="text-gray-500">No documents uploaded yet</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {documents.map((doc) => (
+                            <div
+                                key={doc.id}
+                                className="bg-white p-4 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+                            >
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex items-start gap-3 flex-1">
+                                        <FileText className="h-8 w-8 text-blue-600 mt-1" />
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <p className="font-semibold text-gray-900">{doc.type}</p>
+                                                {getStatusBadge(doc.verification_status)}
+                                            </div>
+                                            <p className="text-xs text-gray-500 mb-1">
+                                                Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}
+                                            </p>
+                                            {doc.expiry_date && (
+                                                <p className={`text-xs ${isExpiringSoon(doc.expiry_date) ? 'text-orange-600 font-semibold' : 'text-gray-500'}`}>
+                                                    {isExpiringSoon(doc.expiry_date) && '⚠️ '}
+                                                    Expires: {new Date(doc.expiry_date).toLocaleDateString()}
+                                                </p>
+                                            )}
+                                            {doc.admin_notes && (
+                                                <p className="text-xs text-gray-600 mt-2 italic">
+                                                    Note: {doc.admin_notes}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <a
+                                            href={doc.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                            title="Download"
+                                        >
+                                            <Download className="h-4 w-4" />
+                                        </a>
+
+                                        {doc.verification_status === 'Pending' && (
+                                            <>
+                                                <button
+                                                    onClick={() => handleVerify(doc.id)}
+                                                    disabled={processing}
+                                                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-semibold disabled:opacity-50"
+                                                >
+                                                    ✓ Verify
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRejectClick(doc)}
+                                                    disabled={processing}
+                                                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-semibold disabled:opacity-50"
+                                                >
+                                                    ✗ Reject
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Reject Modal */}
+            {rejectModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Reject Document</h3>
+
+                        <div className="mb-4">
+                            <p className="text-sm text-gray-600 mb-2">
+                                Document: <span className="font-semibold">{selectedDoc?.type}</span>
+                            </p>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Reason for Rejection *
+                            </label>
+                            <textarea
+                                value={rejectNotes}
+                                onChange={(e) => setRejectNotes(e.target.value)}
+                                placeholder="e.g., Document is expired, unclear image, wrong certificate type..."
+                                rows={4}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                            />
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setRejectModalOpen(false);
+                                    setRejectNotes('');
+                                }}
+                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                                disabled={processing}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleRejectSubmit}
+                                disabled={processing || !rejectNotes.trim()}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {processing ? 'Rejecting...' : 'Reject Document'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 }
