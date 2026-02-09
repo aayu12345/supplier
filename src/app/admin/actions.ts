@@ -198,6 +198,21 @@ export async function createSubRFQ(formData: FormData) {
         }
 
         revalidatePath(`/admin/buyers/rfqs/${parentId}`);
+
+        // Log Activity: RFQ Assigned
+        try {
+            const { logActivity } = await import("@/lib/actions/timeline");
+            await logActivity(
+                userId,
+                'RFQ_ASSIGNED',
+                `New RFQ Assigned: ${subRfqNumber} (Part: ${partName})`,
+                { rfq_id: newRfq.id, parent_rfq_id: parentId },
+                newRfq.id
+            );
+        } catch (logErr) {
+            console.error("Failed to log activity:", logErr);
+        }
+
         return { success: true, newId: newRfq.id };
 
     } catch (error: any) {

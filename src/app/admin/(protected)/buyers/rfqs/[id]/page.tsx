@@ -47,6 +47,7 @@ type AdminRFQDetail = {
 
 type SupplierQuote = {
     id: string;
+    supplier_id: string;
     supplier_name: string;
     price: number;
     lead_time: string;
@@ -303,6 +304,15 @@ export default function AdminRFQDetailPage() {
 
         if (error) alert("Error: " + error.message);
         else {
+            // Log Activity
+            const { logActivity } = await import("@/lib/actions/timeline");
+            await logActivity(
+                quote.supplier_id,
+                "QUOTE_APPROVED",
+                `Quote selected by Admin for RFQ: ${rfq.rfq_number}`,
+                { rfq_id: rfq.id, quote_id: quote.id, price: quote.price }
+            );
+
             alert("Quote Sent to Buyer!");
             fetchData();
         }
@@ -355,6 +365,7 @@ export default function AdminRFQDetailPage() {
 
         const dummyQuote: SupplierQuote = {
             id: 'manual',
+            supplier_id: 'manual-admin-offer', // Dummy ID for manual offer
             supplier_name: 'Admin Manual Offer',
             price: Number(price),
             lead_time: rfq.lead_time_admin || "TBD",

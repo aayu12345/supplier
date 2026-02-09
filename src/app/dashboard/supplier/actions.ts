@@ -64,6 +64,16 @@ export async function uploadPerformaInvoice(formData: FormData) {
 
         if (orderError) throw orderError;
 
+        // Log Activity
+        const { logActivity } = await import("@/lib/actions/timeline");
+        await logActivity(
+            user.id,
+            "PI_UPLOADED",
+            `Proforma Invoice uploaded for Order: ${orderNumber}`,
+            { rfq_id: rfqId, order_number: orderNumber, doc_url: publicUrl },
+            rfqId
+        );
+
         // 4. Update RFQ Status to 'Order Placed' or 'Closed'?
         await supabase.from("rfqs").update({ admin_status: 'Order Placed' }).eq("id", rfqId);
 

@@ -55,7 +55,16 @@ export async function submitQuote(prevState: any, formData: FormData) {
         return { error: error.message };
     }
 
-    // TODO: Send notification to admin (implement later)
+
+    // Log Activity
+    const { logActivity } = await import("@/lib/actions/timeline");
+    await logActivity(
+        user.id,
+        "QUOTE_SUBMITTED",
+        `Quote Submitted`,
+        { quote_id: data.id, amount: unitPrice, rfq_id: rfqId },
+        rfqId
+    );
 
     revalidatePath("/dashboard/supplier/my-rfqs");
     redirect(`/dashboard/supplier/marketplace/${rfqId}/quote/success`);

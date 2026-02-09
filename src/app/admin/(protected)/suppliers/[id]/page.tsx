@@ -22,6 +22,7 @@ import {
     Download,
 } from "lucide-react";
 import Link from "next/link";
+import ActivityTimeline from "@/components/ActivityTimeline";
 
 type SupplierProfile = {
     id: string;
@@ -330,6 +331,7 @@ export default function SupplierDetailPage() {
                             {[
                                 { id: "company", label: "Company Info", icon: Building2 },
                                 { id: "documents", label: "Documents", icon: FileText },
+                                { id: "timeline", label: "Timeline", icon: Clock },
                                 { id: "history", label: "Quoting History", icon: History },
                                 { id: "notes", label: "Admin Notes", icon: StickyNote },
                                 { id: "trust", label: "Trust Score", icon: Award },
@@ -427,6 +429,13 @@ export default function SupplierDetailPage() {
                         {/* Documents Tab */}
                         {activeTab === "documents" && (
                             <DocumentsTab documents={documents} supplierId={supplierId} />
+                        )}
+
+                        {/* Timeline Tab */}
+                        {activeTab === "timeline" && (
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <ActivityTimeline supplierId={supplierId} />
+                            </div>
                         )}
 
                         {/* Quoting History Tab */}

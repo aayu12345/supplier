@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Search, Users, Award, Calendar, CheckCircle, XCircle, AlertCircle, TrendingUp, ChevronDown } from "lucide-react";
 import Link from "next/link";
-import { updateSupplierStatus } from "./actions";
+import { updateSupplierStatus, getAdminSupplierStats } from "./actions";
+import AdminSupplierStats from "@/components/admin/AdminSupplierStats";
 
 type Supplier = {
     id: string;
@@ -27,12 +28,21 @@ export default function SuppliersPage() {
     const [sortBy, setSortBy] = useState<"trust_score" | "last_quote_date" | "login_frequency">("trust_score");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
     const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+    const [stats, setStats] = useState<any>(null); // New Stats State
 
     const supabase = createClient();
 
     useEffect(() => {
         fetchSuppliers();
+        fetchStats(); // Fetch stats on mount
     }, []);
+
+    const fetchStats = async () => {
+        const data = await getAdminSupplierStats();
+        if (!data.error) {
+            setStats(data);
+        }
+    };
 
     const fetchSuppliers = async () => {
         setLoading(true);
@@ -205,6 +215,9 @@ export default function SuppliersPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Stats Cards */}
+                {stats && <AdminSupplierStats stats={stats} />}
 
                 {/* Search and Filters */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
