@@ -34,6 +34,9 @@ type SupplierProfile = {
     msme_number: string;
     address: string;
     created_at: string;
+    contact_person?: string | null;
+    gstin?: string | null;
+    capabilities?: string[];
 };
 
 type Quote = {
