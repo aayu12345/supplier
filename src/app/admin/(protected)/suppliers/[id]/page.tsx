@@ -713,6 +713,23 @@ function DocumentsTab({ documents, supplierId }: { documents: any[], supplierId:
                                                 </button>
                                             </>
                                         )}
+
+                                        {doc.verification_status === 'Rejected' && (
+                                            <button
+                                                onClick={async () => {
+                                                    if (!confirm("Send a notification to the supplier to re-upload this document?")) return;
+                                                    setProcessing(true);
+                                                    const { requestDocumentResubmission } = await import('./document-actions');
+                                                    await requestDocumentResubmission(doc.id);
+                                                    alert("Re-submission request sent to supplier!");
+                                                    setProcessing(false);
+                                                }}
+                                                disabled={processing}
+                                                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold disabled:opacity-50"
+                                            >
+                                                ↻ Resend Request
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>

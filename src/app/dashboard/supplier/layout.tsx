@@ -1,6 +1,7 @@
 import { Factory } from "lucide-react";
 import Link from "next/link";
 import SupplierAccountMenu from "@/components/SupplierAccountMenu";
+import SupplierNotificationsDropdown from "@/components/SupplierNotificationsDropdown";
 
 export default function SupplierLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -18,7 +19,8 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             </Link>
                         </div>
 
-                        <div className="flex items-center">
+                        <div className="flex items-center gap-4">
+                            <SupplierNotificationsDropdown />
                             <SupplierAccountMenu />
                         </div>
                     </div>

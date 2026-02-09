@@ -13,26 +13,7 @@ export default function SettingsPage() {
 
                 <div className="space-y-6">
                     {/* Notifications */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <Bell className="h-5 w-5 text-gray-600" />
-                            <h2 className="text-lg font-bold text-gray-900">Notifications</h2>
-                        </div>
-                        <div className="space-y-3">
-                            <label className="flex items-center justify-between cursor-pointer">
-                                <span className="text-sm text-gray-700">Email notifications for new RFQs</span>
-                                <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
-                            </label>
-                            <label className="flex items-center justify-between cursor-pointer">
-                                <span className="text-sm text-gray-700">Quote status updates</span>
-                                <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
-                            </label>
-                            <label className="flex items-center justify-between cursor-pointer">
-                                <span className="text-sm text-gray-700">Order confirmations</span>
-                                <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
-                            </label>
-                        </div>
-                    </div>
+
 
                     {/* Security */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
