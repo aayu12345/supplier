@@ -17,7 +17,14 @@ type AdminRFQ = {
         email: string;
     };
     visibility_expires_at?: string;
-    supplier_quotes?: { count: number }[];
+    supplier_quotes?: {
+        id: string;
+        supplier_name: string;
+        price: number;
+        lead_time: string;
+        status: string;
+        count?: number; // Keep for backward compat if needed? No, query changed.
+    }[];
     components_count?: number;
 };
 
@@ -49,7 +56,14 @@ export default function AdminRFQsPage() {
                     created_at,
                     admin_status,
                     visibility_expires_at,
-                    supplier_quotes(count),
+                    visibility_expires_at,
+                    supplier_quotes(
+                        id,
+                        supplier_name,
+                        price,
+                        lead_time,
+                        status
+                    ),
                     profiles:user_id (
                         name,
                         company_name,
@@ -122,6 +136,7 @@ export default function AdminRFQsPage() {
                                 <th className="px-6 py-4 font-semibold">Buyer</th>
                                 <th className="px-6 py-4 font-semibold">{activeTab === 'Live' ? 'Visibility Ends' : 'Date Uploaded'}</th>
                                 {activeTab === 'Live' && <th className="px-6 py-4 font-semibold">Quotes Received</th>}
+                                {activeTab === 'Quoted' && <th className="px-6 py-4 font-semibold">Latest Quote</th>}
                                 <th className="px-6 py-4 font-semibold text-right">Action</th>
                             </tr>
                         </thead>
@@ -170,11 +185,37 @@ export default function AdminRFQsPage() {
                                     {activeTab === 'Live' && (
                                         <td className="px-6 py-4 text-sm">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-bold text-gray-900">{rfq.supplier_quotes?.[0]?.count || 0}</span>
+                                                {/* @ts-ignore */}
+                                                <span className="font-bold text-gray-900">{rfq.supplier_quotes?.length || 0}</span>
                                                 <span className="text-gray-500 text-xs">quotes</span>
                                             </div>
-                                            {(rfq.supplier_quotes?.[0]?.count || 0) === 0 && (
+                                            {/* @ts-ignore */}
+                                            {(rfq.supplier_quotes?.length || 0) === 0 && (
                                                 <span className="text-xs text-gray-400">No quotes yet</span>
+                                            )}
+                                        </td>
+                                    )}
+                                    {activeTab === 'Quoted' && (
+                                        <td className="px-6 py-4 text-sm">
+                                            {rfq.supplier_quotes && rfq.supplier_quotes.length > 0 ? (
+                                                <div className="flex flex-col gap-1">
+                                                    {/* Show only the latest/lowest quote or a summary */}
+                                                    {/* @ts-ignore */}
+                                                    {rfq.supplier_quotes.slice(0, 1).map((q: any) => (
+                                                        <div key={q.id}>
+                                                            <p className="font-bold text-gray-900">{q.supplier_name}</p>
+                                                            <div className="flex gap-2 text-xs">
+                                                                <span className="text-green-600 font-semibold">₹{q.price}</span>
+                                                                <span className="text-gray-400">• {q.lead_time}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {rfq.supplier_quotes.length > 1 && (
+                                                        <p className="text-xs text-blue-500">+{rfq.supplier_quotes.length - 1} more</p>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-gray-400">Pending...</span>
                                             )}
                                         </td>
                                     )}

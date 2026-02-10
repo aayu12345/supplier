@@ -28,12 +28,33 @@ export async function submitQuote(prevState: any, formData: FormData) {
         return { error: "Please fill in all required fields" };
     }
 
-    // Get supplier name from profile
+    // Get Supplier Profile for Name
     const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name")
+        .select("contact_person, company_name, name, email")
         .eq("id", user.id)
         .single();
+
+    // Construct Display Name
+    let supplierName = "Unknown Supplier";
+
+    if (profile) {
+        const contact = profile.contact_person?.trim();
+        const company = profile.company_name?.trim();
+        const name = profile.name?.trim();
+
+        if (contact && company) {
+            supplierName = `${contact} (${company})`;
+        } else if (company) {
+            supplierName = company;
+        } else if (contact) {
+            supplierName = contact;
+        } else if (name) {
+            supplierName = name;
+        } else {
+            supplierName = profile.email || "Unknown Supplier";
+        }
+    }
 
     // Insert quote using correct schema column names
     const { data, error } = await supabase
@@ -41,7 +62,7 @@ export async function submitQuote(prevState: any, formData: FormData) {
         .insert({
             rfq_id: rfqId,
             supplier_id: user.id,
-            supplier_name: profile?.full_name || "Unknown Supplier",
+            supplier_name: supplierName,
             price: unitPrice,
             lead_time: `${deliveryTime} days`,
             remarks: notes || null,
@@ -53,6 +74,19 @@ export async function submitQuote(prevState: any, formData: FormData) {
     if (error) {
         console.error("Error submitting quote:", error);
         return { error: error.message };
+    }
+
+    // Update RFQ Status to 'Quoted' if it is 'Live'
+    // This ensures it moves to the 'Quoted' tab in Admin Dashboard
+    const { error: updateError } = await supabase
+        .from('rfqs')
+        .update({ admin_status: 'Quoted' })
+        .eq('id', rfqId)
+        .eq('admin_status', 'Live');
+
+    if (updateError) {
+        console.error("Error updating RFQ status:", updateError);
+        // We don't block the user, just log it
     }
 
 

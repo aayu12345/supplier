@@ -40,11 +40,11 @@ export default function MarketplacePage() {
 
             const quotedIds = quotedRfqIds?.map(q => q.rfq_id) || [];
 
-            // Fetch Live RFQs
+            // Fetch Live AND Quoted RFQs (so they remain visible even after someone quotes)
             let query = supabase
                 .from("rfqs")
                 .select("*")
-                .eq("admin_status", "Live");
+                .in("admin_status", ["Live", "Live Running", "Quoted"]);
 
             // Only exclude if there are quoted RFQs
             if (quotedIds.length > 0) {
@@ -52,6 +52,8 @@ export default function MarketplacePage() {
             }
 
             const { data, error } = await query.order("created_at", { ascending: false });
+
+            console.log("DEBUG: Marketplace Fetched RFQs:", data);
 
             if (error) throw error;
             setRfqs(data as any);
