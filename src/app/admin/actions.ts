@@ -68,6 +68,8 @@ export async function createSubRFQ(formData: FormData) {
         const rfqType = formData.get("rfqType") as string || 'single';
 
         // Specifications Section
+        const productionQty = formData.get("productionQty") as string; // Quantity
+        const drawingNumber = formData.get("drawingNumber") as string; // Drawing Number
         const materialSize = formData.get("materialSize") as string;
         const mietWeight = formData.get("mietWeight") as string;
         const sampleQty = formData.get("sampleQty") as string;
@@ -77,8 +79,9 @@ export async function createSubRFQ(formData: FormData) {
         const surfaceFinishing = formData.get("surfaceFinishing") as string;
         const hardness = formData.get("hardness") as string;
 
-        // Pricing
+        // Pricing & Lead Time
         const targetPrice = formData.get("targetPrice") as string;
+        const leadTime = formData.get("leadTime") as string;
 
         // Production Details
         const productionRemarks = formData.get("productionRemarks") as string;
@@ -108,9 +111,9 @@ export async function createSubRFQ(formData: FormData) {
         const suffix = (count || 0) + 1;
         const subRfqNumber = `${parentRfqNumber}-${String(suffix).padStart(2, '0')}`;
 
-        // 2. Handle File Upload (if present)
-        let fileUrl = null;
-        let fileName = null;
+        // 2. Handle File Upload (Start with existing if provided)
+        let fileUrl = formData.get("existingFileUrl") as string | null;
+        let fileName = formData.get("existingFileName") as string | null;
 
         if (drawingFile && drawingFile.size > 0) {
             try {
@@ -147,8 +150,13 @@ export async function createSubRFQ(formData: FormData) {
 
                 // Basic Info
                 part_name: partName,
+                drawing_number: drawingNumber,
+                quantity: productionQty,
                 type: rfqType,
                 admin_notes: notes || null,
+
+                // Form Fields
+                lead_time_admin: leadTime || null,
 
                 // File
                 file_url: fileUrl,

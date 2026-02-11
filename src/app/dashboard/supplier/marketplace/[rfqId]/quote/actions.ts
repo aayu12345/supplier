@@ -78,15 +78,34 @@ export async function submitQuote(prevState: any, formData: FormData) {
 
     // Update RFQ Status to 'Quoted' if it is 'Live'
     // This ensures it moves to the 'Quoted' tab in Admin Dashboard
-    const { error: updateError } = await supabase
+    // IMPORTANT: We use the admin client here to bypass RLS policies
+    console.log('=== ATTEMPTING RFQ STATUS UPDATE ===');
+    console.log('RFQ ID:', rfqId);
+
+    // Import admin client that bypasses RLS
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const adminSupabase = createAdminClient();
+
+    const { data: updateData, error: updateError } = await adminSupabase
         .from('rfqs')
         .update({ admin_status: 'Quoted' })
         .eq('id', rfqId)
-        .eq('admin_status', 'Live');
+        .eq('admin_status', 'Live')
+        .select();
+
+    console.log('Update Result:', updateData);
+    console.log('Update Error:', updateError);
 
     if (updateError) {
         console.error("Error updating RFQ status:", updateError);
+        console.error("Error details:", JSON.stringify(updateError, null, 2));
         // We don't block the user, just log it
+    } else if (!updateData || updateData.length === 0) {
+        console.warn("RFQ status was not updated. Possible reasons:");
+        console.warn("1. RFQ is not in 'Live' status");
+        console.warn("2. RFQ ID does not exist");
+    } else {
+        console.log("✅ RFQ status successfully updated to 'Quoted'");
     }
 
 

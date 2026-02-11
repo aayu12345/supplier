@@ -11,8 +11,8 @@ export async function submitRFQ(formData: FormData) {
         const file = formData.get("file") as File;
         const type = formData.get("type") as string;
 
-        // Validation: Main file required only for single type
-        if (type !== "multiple" && !file) return { error: "No file uploaded." };
+        // Validation: Main file required for ALL types now
+        if (!file) return { error: "No file uploaded." };
         if (file && file.size > 50 * 1024 * 1024) return { error: "File size exceeds 50MB limit." };
 
         const rfqNumber = `RFQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -126,40 +126,18 @@ export async function submitRFQ(formData: FormData) {
                 if (itemsJson) {
                     const items = JSON.parse(itemsJson);
 
-                    // Process items in parallel for uploads
-                    const processedItems = await Promise.all(items.map(async (item: any, index: number) => {
-                        const itemFile = formData.get(`item_file_${index}`) as File;
-                        let itemFileUrl = null;
-                        let itemFileName = null;
-
-                        if (itemFile) {
-                            const ext = itemFile.name.split(".").pop();
-                            const fileName = `${rfqNumber}_Item${index + 1}_${Date.now()}.${ext}`;
-                            const path = `${new Date().getFullYear()}/${fileName}`;
-
-                            const { error: uploadError } = await supabaseAdmin.storage
-                                .from("rfq-drawings")
-                                .upload(path, itemFile);
-
-                            if (!uploadError) {
-                                const { data } = supabaseAdmin.storage.from("rfq-drawings").getPublicUrl(path);
-                                itemFileUrl = data.publicUrl;
-                                itemFileName = itemFile.name;
-                            } else {
-                                console.error(`Failed to upload file for item ${index}:`, uploadError);
-                            }
-                        }
-
+                    // Process items
+                    const processedItems = items.map((item: any, index: number) => {
                         return {
                             rfq_id: rfqData.id,
                             drawing_number: item.drawing_number,
                             quantity: item.quantity,
                             target_price: item.target_price || null,
                             lead_time: item.lead_time || null,
-                            file_url: itemFileUrl,
-                            file_name: itemFileName
+                            file_url: null, // Sub-items don't have individual files anymore
+                            file_name: fileName // Link to parent file name if needed for reference, or null
                         };
-                    }));
+                    });
 
                     if (processedItems.length > 0) {
                         const { error: itemsError } = await supabaseAdmin.from("rfq_items").insert(processedItems);

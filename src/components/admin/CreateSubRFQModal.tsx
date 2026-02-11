@@ -31,8 +31,14 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
         formData.append("userId", userId);
         formData.append("rfqType", 'single');
 
+        // If a new file is selected, it will be in formData as 'drawing'
+        // If not, and we want to keep the old one, we might need to handle that in backend
+        // But for now, let's assume if no new file, backend keeps the existing one or we pass the url
         if (file) {
             formData.append("drawing", file);
+        } else if (itemData?.file_url) {
+            formData.append("existingFileUrl", itemData.file_url);
+            formData.append("existingFileName", itemData.file_name);
         }
 
         const result = await createSubRFQ(formData);
@@ -78,7 +84,7 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                             </div>
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Part Name <span className="text-red-500">*</span></label>
-                                <input name="partName" placeholder="e.g. Precision Shaft" className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" required />
+                                <input name="partName" defaultValue={itemData?.part_name} placeholder="e.g. Precision Shaft" className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" required />
                             </div>
                         </div>
 
@@ -92,6 +98,7 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                                     <div className="border-2 border-dashed border-blue-200 rounded-lg bg-blue-50/30 hover:bg-blue-50 hover:border-blue-400 transition-all cursor-pointer relative group h-full min-h-[120px] flex flex-col items-center justify-center text-center p-4">
                                         <input
                                             type="file"
+                                            name="drawing"
                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                             onChange={(e) => setFile(e.target.files?.[0] || null)}
                                         />
@@ -103,6 +110,16 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                                                 <div className="text-left">
                                                     <p className="font-bold text-gray-900 text-sm">{file.name}</p>
                                                     <p className="text-xs text-green-600 font-medium">Ready to upload</p>
+                                                </div>
+                                            </div>
+                                        ) : itemData?.file_url ? (
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-blue-100 p-2 rounded-full text-blue-600">
+                                                    <FileText className="h-5 w-5" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <p className="font-bold text-gray-900 text-sm">{itemData.file_name || "Existing Drawing"}</p>
+                                                    <p className="text-xs text-blue-600 font-medium"><a href={itemData.file_url} target="_blank" rel="noopener noreferrer" className="underline z-20 relative">View Current</a>  • Click to Change</p>
                                                 </div>
                                             </div>
                                         ) : (
@@ -123,6 +140,7 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                                         rows={4}
                                         className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-yellow-50/50 focus:bg-white transition-colors"
                                         placeholder="e.g. Tight tolerances required..."
+                                        defaultValue={itemData?.notes || ""}
                                     ></textarea>
                                 </div>
                             </div>
@@ -132,6 +150,14 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                         <div className="px-6 py-5 space-y-4 bg-gray-50/30">
                             <h3 className="text-sm font-bold text-gray-900 border-l-4 border-green-600 pl-3">Specifications</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-600">Quantity <span className="text-red-500">*</span></label>
+                                    <input name="productionQty" type="number" defaultValue={itemData?.quantity} placeholder="100" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-600">Drawing Number <span className="text-red-500">*</span></label>
+                                    <input name="drawingNumber" defaultValue={itemData?.drawing_number} placeholder="DWG-001" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                                </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-gray-600">Material Size</label>
                                     <div className="relative">
@@ -173,8 +199,8 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                             </div>
                         </div>
 
-                        {/* SECTION 4: TARGET PRICE */}
-                        <div className="px-6 py-4 bg-blue-50/50 border-y border-blue-100">
+                        {/* SECTION 4: TARGET PRICE & LEAD TIME */}
+                        <div className="px-6 py-4 bg-blue-50/50 border-y border-blue-100 grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="flex items-center gap-4">
                                 <label className="text-sm font-bold text-gray-900 whitespace-nowrap">Target Price:</label>
                                 <div className="relative max-w-[200px]">
@@ -184,10 +210,22 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                                         type="number"
                                         step="0.01"
                                         placeholder="250.00"
+                                        defaultValue={itemData?.target_price}
                                         className="w-full pl-7 pr-3 py-2 border border-blue-300 rounded-lg font-bold text-lg text-blue-800 focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
                                 </div>
                                 <span className="text-gray-500 text-sm">per / piece</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <label className="text-sm font-bold text-gray-900 whitespace-nowrap">Lead Time:</label>
+                                <div className="relative w-full">
+                                    <input
+                                        name="leadTime"
+                                        type="date"
+                                        defaultValue={itemData?.lead_time}
+                                        className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
                             </div>
                         </div>
 

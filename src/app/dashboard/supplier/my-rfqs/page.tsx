@@ -94,6 +94,7 @@ export default function SupplierMyRFQsPage() {
     };
 
     const displayedQuotes = quotes
+        .filter(q => q.rfqs) // Ensure RFQ data exists
         .filter(q => {
             const status = getDisplayStatus(q);
             if (filter === 'All') return true;

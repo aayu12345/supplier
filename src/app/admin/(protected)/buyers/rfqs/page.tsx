@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { FileText, Eye, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
@@ -17,13 +18,24 @@ type AdminRFQ = {
         email: string;
     };
     visibility_expires_at?: string;
+    parent_rfq_id?: string | null;
     supplier_quotes?: {
         id: string;
         supplier_name: string;
         price: number;
         lead_time: string;
         status: string;
-        count?: number; // Keep for backward compat if needed? No, query changed.
+        count?: number;
+    }[];
+    sub_rfqs?: {
+        id: string;
+        rfq_number: string;
+        admin_status: string;
+        supplier_quotes?: {
+            id: string;
+            supplier_name: string;
+            price: number;
+        }[];
     }[];
     components_count?: number;
 };
@@ -31,20 +43,39 @@ type AdminRFQ = {
 const TABS = ["New", "Live", "Quoted", "Sent to Buyer", "Approved", "Rejected"];
 
 export default function AdminRFQsPage() {
-    const [activeTab, setActiveTab] = useState("New");
+    const searchParams = useSearchParams();
+    const router = useRouter(); // To update URL without reload if needed, or just reading is fine
+    // Initialize tab from URL or default to "New"
+    const initialTab = searchParams.get("tab") && TABS.includes(searchParams.get("tab")!)
+        ? searchParams.get("tab")!
+        : "New";
+
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [rfqs, setRfqs] = useState<AdminRFQ[]>([]);
     const [loading, setLoading] = useState(true);
     const supabase = createClient();
+
+    // Update activeTab when URL changes (back button support)
+    useEffect(() => {
+        const tab = searchParams.get("tab");
+        if (tab && TABS.includes(tab)) {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         fetchRFQs();
     }, [activeTab]);
 
+    // Update URL when tab changes
+    const handleTabChange = (tab: string) => {
+        setActiveTab(tab);
+        // Optional: Update URL without full reload
+        router.push(`/admin/buyers/rfqs?tab=${tab}`);
+    };
+
     const fetchRFQs = async () => {
         setLoading(true);
-        // Determine status filter based on tab
-        // If "New", maybe we want 'New' status.
-        // Assuming tab names match status exactly for simplicity.
 
         try {
             let query = supabase
@@ -56,7 +87,7 @@ export default function AdminRFQsPage() {
                     created_at,
                     admin_status,
                     visibility_expires_at,
-                    visibility_expires_at,
+                    parent_rfq_id,
                     supplier_quotes(
                         id,
                         supplier_name,
@@ -87,7 +118,35 @@ export default function AdminRFQsPage() {
                 console.error("Error fetching RFQs (Full):", JSON.stringify(error, null, 2));
                 console.error("Error Message:", error.message);
             } else {
-                setRfqs(data as unknown as AdminRFQ[]);
+                // For Quoted tab, fetch sub-RFQs for each parent RFQ
+                if (activeTab === 'Quoted' && data) {
+                    const rfqsWithSubRfqs = await Promise.all(
+                        data.map(async (rfq: any) => {
+                            const { data: subRfqs } = await supabase
+                                .from('rfqs')
+                                .select(`
+                                    id,
+                                    rfq_number,
+                                    admin_status,
+                                    supplier_quotes(
+                                        id,
+                                        supplier_name,
+                                        price
+                                    )
+                                `)
+                                .eq('parent_rfq_id', rfq.id)
+                                .eq('admin_status', 'Quoted');
+
+                            return {
+                                ...rfq,
+                                sub_rfqs: subRfqs || []
+                            };
+                        })
+                    );
+                    setRfqs(rfqsWithSubRfqs as unknown as AdminRFQ[]);
+                } else {
+                    setRfqs(data as unknown as AdminRFQ[]);
+                }
             }
         } catch (err) {
             console.error(err);
@@ -103,7 +162,7 @@ export default function AdminRFQsPage() {
                 {TABS.map((tab) => (
                     <button
                         key={tab}
-                        onClick={() => setActiveTab(tab)}
+                        onClick={() => handleTabChange(tab)}
                         className={`px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab
                             ? "bg-white text-blue-600 border-b-2 border-blue-600 -mb-[2px]"
                             : "bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
@@ -220,13 +279,51 @@ export default function AdminRFQsPage() {
                                         </td>
                                     )}
                                     <td className="px-6 py-4 text-right">
-                                        <Link
-                                            href={`/admin/buyers/rfqs/${rfq.id}`}
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all shadow-sm"
-                                        >
-                                            View & Manage
-                                            <ArrowRight className="h-4 w-4" />
-                                        </Link>
+                                        {(() => {
+                                            // For Quoted tab, check if this is a parent RFQ with sub-RFQs
+                                            console.log('RFQ Debug:', {
+                                                rfq_number: rfq.rfq_number,
+                                                activeTab,
+                                                has_sub_rfqs: !!rfq.sub_rfqs,
+                                                sub_rfqs_length: rfq.sub_rfqs?.length,
+                                                sub_rfqs_data: rfq.sub_rfqs
+                                            });
+
+                                            if (activeTab === 'Quoted' && rfq.sub_rfqs && rfq.sub_rfqs.length > 0) {
+                                                // Find the first sub-RFQ that has quotes
+                                                const subRfqWithQuotes = rfq.sub_rfqs.find((sub: any) =>
+                                                    sub.supplier_quotes && sub.supplier_quotes.length > 0
+                                                );
+
+                                                const targetId = subRfqWithQuotes ? subRfqWithQuotes.id : rfq.sub_rfqs[0].id;
+
+                                                console.log('Navigating to sub-RFQ:', {
+                                                    targetId,
+                                                    subRfqWithQuotes: subRfqWithQuotes?.rfq_number
+                                                });
+
+                                                return (
+                                                    <Link
+                                                        href={`/admin/buyers/rfqs/${targetId}`}
+                                                        className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all shadow-sm"
+                                                    >
+                                                        Offer
+                                                        <ArrowRight className="h-4 w-4" />
+                                                    </Link>
+                                                );
+                                            }
+
+                                            // Default behavior for non-parent RFQs or other tabs
+                                            return (
+                                                <Link
+                                                    href={`/admin/buyers/rfqs/${rfq.id}`}
+                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all shadow-sm"
+                                                >
+                                                    {activeTab === 'Quoted' ? 'Offer' : 'View & Manage'}
+                                                    <ArrowRight className="h-4 w-4" />
+                                                </Link>
+                                            );
+                                        })()}
                                     </td>
                                 </tr>
                             ))}

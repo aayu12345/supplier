@@ -289,6 +289,7 @@ export default function AdminRFQDetailPage() {
             .from("rfqs")
             .update({
                 admin_status: 'Sent to Buyer',
+                status: 'Quoted', // Update buyer-facing status so they can see it
                 quote_price: quote.price,
                 quote_lead_time: quote.lead_time
             })
@@ -313,8 +314,9 @@ export default function AdminRFQDetailPage() {
                 { rfq_id: rfq.id, quote_id: quote.id, price: quote.price }
             );
 
-            alert("Quote Sent to Buyer!");
-            fetchData();
+            // alert("Quote Sent to Buyer!");
+            // fetchData();
+            router.push("/admin/buyers/rfqs?tab=Sent to Buyer");
         }
     };
 
@@ -636,69 +638,132 @@ export default function AdminRFQDetailPage() {
                             <form onSubmit={handleSubmitLive(onSubmitLive)} className="space-y-6">
 
                                 {/* Basic Info */}
-                                <div className="space-y-3">
-                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-blue-600 pl-3">Basic Information</h3>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input {...registerLive("part_name")} placeholder="Part Name" className="input-field text-sm" />
-                                        <input {...registerLive("weight_per_piece")} placeholder="Weight (kg)" className="input-field text-sm" type="number" step="0.001" />
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-800 border-l-4 border-blue-600 pl-3 uppercase">Basic Information</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Part Name</label>
+                                            <input {...registerLive("part_name")} placeholder="Part Name" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Weight per Piece (kg)</label>
+                                            <input {...registerLive("weight_per_piece")} placeholder="0.00" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" type="number" step="0.001" />
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Specifications */}
-                                <div className="space-y-3">
-                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-green-600 pl-3">Specifications</h3>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input {...registerLive("material_size")} placeholder="Material Size (e.g. 20x2x100 mm)" className="input-field text-sm" />
-                                        <input {...registerLive("miet_weight")} placeholder="Miet Weight (kg)" className="input-field text-sm" type="number" step="0.01" />
-                                        <input {...registerLive("sample_quantity")} placeholder="Sample Qty" className="input-field text-sm" type="number" />
-                                        <input {...registerLive("sample_lead_time")} placeholder="Sample Lead Time" className="input-field text-sm" />
-                                        <input {...registerLive("total_process")} placeholder="Total Process" className="input-field text-sm" />
-                                        <input {...registerLive("material_admin")} placeholder="Material" className="input-field text-sm" />
-                                        <input {...registerLive("finish")} placeholder="Surface Finishing" className="input-field text-sm" />
-                                        <input {...registerLive("hardness")} placeholder="Hardness" className="input-field text-sm" />
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-800 border-l-4 border-green-600 pl-3 uppercase">Specifications</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Material Size</label>
+                                            <input {...registerLive("material_size")} placeholder="e.g. 20x2x100 mm" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Miet Weight (kg)</label>
+                                            <input {...registerLive("miet_weight")} placeholder="0.00" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" type="number" step="0.01" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Sample Qty</label>
+                                            <input {...registerLive("sample_quantity")} placeholder="0" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" type="number" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Sample Lead Time</label>
+                                            <input {...registerLive("sample_lead_time")} placeholder="e.g. 7 Days" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Total Process</label>
+                                            <input {...registerLive("total_process")} placeholder="e.g. CNC Turning" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Material</label>
+                                            <input {...registerLive("material_admin")} placeholder="e.g. Aluminum" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Surface Finishing</label>
+                                            <input {...registerLive("finish")} placeholder="e.g. Anodized" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Hardness</label>
+                                            <input {...registerLive("hardness")} placeholder="e.g. 40 HRC" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Pricing & Lead Time */}
-                                <div className="space-y-3">
-                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-purple-600 pl-3">Pricing & Timeline</h3>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input {...registerLive("target_price")} placeholder="Target Price (₹ per piece)" className="input-field text-sm" type="number" step="0.01" />
-                                        <input {...registerLive("lead_time_admin")} placeholder="Standard Lead Time" className="input-field text-sm" />
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-800 border-l-4 border-purple-600 pl-3 uppercase">Pricing & Timeline</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Target Price (₹)</label>
+                                            <div className="relative">
+                                                <span className="absolute left-2 top-2 text-gray-400 font-bold">₹</span>
+                                                <input {...registerLive("target_price")} placeholder="0.00" className="w-full border border-gray-300 rounded pl-6 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-800" type="number" step="0.01" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Standard Lead Time</label>
+                                            <input {...registerLive("lead_time_admin")} placeholder="e.g. 4 Weeks" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Production Details */}
-                                <div className="space-y-3">
-                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-orange-600 pl-3">Production Details</h3>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <input {...registerLive("production_remarks")} placeholder="Production Remarks" className="input-field text-sm" />
-                                        <input {...registerLive("job_warnings")} placeholder="Job Warnings" className="input-field text-sm bg-red-50 border-red-200" />
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-800 border-l-4 border-orange-600 pl-3 uppercase">Production Details</h3>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Production Remarks</label>
+                                            <input {...registerLive("production_remarks")} placeholder="Enter remarks..." className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-red-600">Job Warnings</label>
+                                            <input {...registerLive("job_warnings")} placeholder="Critical warnings..." className="w-full border border-red-200 bg-red-50 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none text-red-700 placeholder-red-300" />
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Future Demand */}
-                                <div className="space-y-3">
-                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-indigo-600 pl-3">Future Demand</h3>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input {...registerLive("future_demand_date")} placeholder="Future Demand Date" className="input-field text-sm" type="date" />
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <span className="text-xs">Frequency saved in draft</span>
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-800 border-l-4 border-indigo-600 pl-3 uppercase">Future Demand</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Future Demand Date</label>
+                                            <input {...registerLive("future_demand_date")} className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" type="date" />
+                                        </div>
+                                        <div className="flex items-end pb-2">
+                                            <span className="text-xs text-gray-500 italic">Frequency is saved from draft creation.</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Publishing Settings */}
-                                <div className="space-y-3 pt-4 border-t border-gray-200">
-                                    <h3 className="text-sm font-bold text-gray-700 border-l-4 border-yellow-600 pl-3">Publishing Settings</h3>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input {...registerLive("visibility_days")} placeholder="Days Visible (e.g. 3)" className="input-field text-sm" type="number" defaultValue={3} />
-                                        <input {...registerLive("admin_notes")} placeholder="Notes for Supplier" className="input-field text-sm bg-yellow-50" />
+                                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 space-y-3">
+                                    <h3 className="text-sm font-bold text-gray-800 border-l-4 border-yellow-600 pl-3 uppercase">Publishing Settings</h3>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-semibold text-gray-600">Visibility (Days)</label>
+                                                <input {...registerLive("visibility_days")} placeholder="3" className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" type="number" defaultValue={3} />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-semibold text-gray-600">Notes for Supplier</label>
+                                            <textarea {...registerLive("admin_notes")} placeholder="Notes visible to suppliers..." rows={2} className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" />
+                                        </div>
                                     </div>
                                 </div>
 
-                                <button type="submit" disabled={saving} className="btn-primary w-full py-3 text-base font-bold">
-                                    {saving ? "Publishing..." : "✓ Make Live to Suppliers"}
+                                <button type="submit" disabled={saving} className="w-full bg-blue-700 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center justify-center gap-2">
+                                    {saving ? (
+                                        "Publishing..."
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 className="h-5 w-5" />
+                                            Validate & Publish Live
+                                        </>
+                                    )}
                                 </button>
                             </form>
                         </div>

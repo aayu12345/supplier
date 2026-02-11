@@ -22,15 +22,14 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
         quantity: string;
         target_price: string;
         lead_time: string;
-        file: File | null;
     };
 
     const [items, setItems] = useState<RFQItem[]>([
-        { drawing_number: "", quantity: "", target_price: "", lead_time: "", file: null }
+        { drawing_number: "", quantity: "", target_price: "", lead_time: "" }
     ]);
 
     const addItem = () => {
-        setItems([...items, { drawing_number: "", quantity: "", target_price: "", lead_time: "", file: null }]);
+        setItems([...items, { drawing_number: "", quantity: "", target_price: "", lead_time: "" }]);
     };
 
     const removeItem = (index: number) => {
@@ -50,7 +49,7 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (rfqType === "single" && !file) {
+        if (!file) {
             alert("Please upload a drawing file.");
             return;
         }
@@ -61,9 +60,6 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
                 alert("Please add at least one item.");
                 return;
             }
-            // Optional: Validate that items have files?
-            // const missingFiles = items.filter(i => !i.file);
-            // if (missingFiles.length > 0) { alert("Please upload drawings for all items."); return; }
         }
 
         setIsSubmitting(true);
@@ -86,13 +82,6 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
                     lead_time: item.lead_time
                 }));
                 data.set("items", JSON.stringify(itemsMeta));
-
-                // Append files separately
-                items.forEach((item, index) => {
-                    if (item.file) {
-                        data.append(`item_file_${index}`, item.file);
-                    }
-                });
             }
 
             // Call Server Action
@@ -136,17 +125,20 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-8">
-                    {/* Section 1: File Upload (Only for Single Type) */}
-                    {rfqType === "single" && (
-                        <section>
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-                                    1. Upload Drawing <span className="text-red-500">*</span>
-                                </h3>
-                            </div>
-                            <FileUploadZone onFileSelect={setFile} selectedFile={file} />
-                        </section>
-                    )}
+                    {/* Section 1: File Upload (Common for Both Types) */}
+                    <section>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+                                1. Upload Drawing <span className="text-red-500">*</span>
+                            </h3>
+                        </div>
+                        <FileUploadZone onFileSelect={setFile} selectedFile={file} />
+                        <p className="text-xs text-gray-500 mt-2">
+                            {rfqType === "multiple"
+                                ? "Upload the main drawing containing all items."
+                                : "Upload the drawing file for this part."}
+                        </p>
+                    </section>
 
                     {/* Section 2: RFQ Type */}
                     <section>
@@ -268,42 +260,6 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
                                                 onChange={(e) => updateItem(index, "lead_time", e.target.value)}
                                                 className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                                             />
-                                        </div>
-
-                                        {/* Item File Upload */}
-                                        <div className="md:col-span-4 flex items-center gap-2">
-                                            <label className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md cursor-pointer transition-colors text-xs font-medium border border-gray-200">
-                                                <input
-                                                    type="file"
-                                                    className="hidden"
-                                                    onChange={(e) => {
-                                                        const file = e.target.files?.[0];
-                                                        if (file) updateItem(index, "file", file);
-                                                    }}
-                                                />
-                                                {item.file ? (
-                                                    <span className="text-blue-600 flex items-center gap-1">
-                                                        <FileText className="h-3 w-3" />
-                                                        {item.file.name}
-                                                    </span>
-                                                ) : (
-                                                    <>
-                                                        <span className="h-4 w-4 flex items-center justify-center border border-gray-400 rounded-sm">
-                                                            <span className="text-[10px]">+</span>
-                                                        </span>
-                                                        Upload Drawing
-                                                    </>
-                                                )}
-                                            </label>
-                                            {item.file && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => updateItem(index, "file", null)}
-                                                    className="text-red-500 hover:text-red-700 p-1"
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </button>
-                                            )}
                                         </div>
 
                                         {items.length > 1 && (
