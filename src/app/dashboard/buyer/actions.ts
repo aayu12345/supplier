@@ -172,7 +172,11 @@ export async function approveQuote(rfqId: string) {
 
     const { error } = await supabase
         .from("rfqs")
-        .update({ status: "Approved", updated_at: new Date().toISOString() })
+        .update({
+            status: "Approved",
+            admin_status: "Approved", // Also update admin_status so it appears in admin's Approved tab
+            updated_at: new Date().toISOString()
+        })
         .eq("id", rfqId);
 
     if (error) {

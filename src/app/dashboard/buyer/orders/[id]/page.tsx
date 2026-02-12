@@ -101,7 +101,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
                     {/* Middle Column: Timeline (8 cols) */}
                     <div className="lg:col-span-8">
-                        <OrderTimeline events={timelineData as unknown as TimelineEvent[]} />
+                        <OrderTimeline events={(timelineData || []) as unknown as TimelineEvent[]} />
                     </div>
 
                     {/* Mobile Only Support */}

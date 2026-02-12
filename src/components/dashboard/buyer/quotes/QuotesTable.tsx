@@ -12,6 +12,8 @@ export type RFQ = {
     file_name: string;
     quantity: number | string;
     lead_time: string; // User requested
+    target_price?: number; // Admin's target price
+    notes?: string; // Requirements/notes
     status: "Pending" | "Quoted" | "Negotiation" | "Rejected" | "Approved";
     created_at: string;
     updated_at: string;
@@ -152,7 +154,11 @@ export default function QuotesTable() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-gray-600">{rfq.quantity || '—'}</td>
-                                        <td className="px-6 py-4 text-gray-600">{rfq.lead_time || '—'}</td>
+                                        <td className="px-6 py-4 text-gray-600">
+                                            {rfq.status === 'Quoted' && rfq.quote_lead_time
+                                                ? rfq.quote_lead_time
+                                                : (rfq.lead_time || '—')}
+                                        </td>
                                         <td className="px-6 py-4">
                                             <span
                                                 className={`px-2.5 py-1 rounded-md text-xs font-bold ${getStatusColor(

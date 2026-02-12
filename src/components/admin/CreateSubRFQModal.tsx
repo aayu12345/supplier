@@ -222,7 +222,8 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                                     <input
                                         name="leadTime"
                                         type="date"
-                                        defaultValue={itemData?.lead_time}
+                                        defaultValue={itemData?.lead_time_admin}
+                                        required
                                         className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
                                 </div>

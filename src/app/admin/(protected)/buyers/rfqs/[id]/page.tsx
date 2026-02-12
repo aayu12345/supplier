@@ -285,13 +285,17 @@ export default function AdminRFQDetailPage() {
         if (!confirm(`Send Quote of ${quote.price} to Buyer?`)) return;
 
         // 1. Update RFQ with selected price and status
+        const validUntil = new Date();
+        validUntil.setDate(validUntil.getDate() + 7); // Valid for 7 days
+
         const { error } = await supabase
             .from("rfqs")
             .update({
                 admin_status: 'Sent to Buyer',
                 status: 'Quoted', // Update buyer-facing status so they can see it
                 quote_price: quote.price,
-                quote_lead_time: quote.lead_time
+                quote_lead_time: rfq.lead_time_admin || quote.lead_time, // Use admin's lead time, fallback to supplier's
+                quote_valid_until: validUntil.toISOString().split('T')[0] // Format as YYYY-MM-DD
             })
             .eq("id", rfq.id);
 

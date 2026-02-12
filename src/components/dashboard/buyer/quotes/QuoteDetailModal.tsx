@@ -67,7 +67,7 @@ export default function QuoteDetailModal({ isOpen, onClose, quote }: QuoteDetail
                             </div>
                             <div>
                                 <p className="text-gray-500">Target Price:</p>
-                                <p className="font-semibold text-gray-900">$25.00 ea</p>
+                                <p className="font-semibold text-gray-900">₹{quote.target_price?.toFixed(2) || 'N/A'} ea</p>
                             </div>
                             <div>
                                 <p className="text-gray-500">Lead Time:</p>
@@ -75,7 +75,7 @@ export default function QuoteDetailModal({ isOpen, onClose, quote }: QuoteDetail
                             </div>
                             <div>
                                 <p className="text-gray-500">Requirements:</p>
-                                <p className="font-semibold text-gray-900">Expedited delivery</p>
+                                <p className="font-semibold text-gray-900">{quote.notes || 'No special requirements'}</p>
                             </div>
                         </div>
                     </div>
@@ -85,7 +85,7 @@ export default function QuoteDetailModal({ isOpen, onClose, quote }: QuoteDetail
                         <h3 className="text-sm font-bold text-gray-900 mb-4 uppercase tracking-wide">Our Offer</h3>
 
                         <div className="flex items-baseline gap-2 mb-4">
-                            <span className="text-3xl font-bold text-gray-900">${quote.quote_price?.toFixed(2)}</span>
+                            <span className="text-3xl font-bold text-gray-900">₹{quote.quote_price?.toFixed(2)}</span>
                             <span className="text-lg text-gray-500 font-medium">ea</span>
                         </div>
 
