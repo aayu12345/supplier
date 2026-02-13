@@ -66,6 +66,7 @@ export async function createSubRFQ(formData: FormData) {
         const notes = formData.get("notes") as string;
         const drawingFile = formData.get("drawing") as File | null;
         const rfqType = formData.get("rfqType") as string || 'single';
+        const mode = formData.get("mode") as string || 'draft'; // 'draft' or 'live'
 
         // Specifications Section
         const productionQty = formData.get("productionQty") as string; // Quantity
@@ -146,7 +147,7 @@ export async function createSubRFQ(formData: FormData) {
                 rfq_number: subRfqNumber,
                 user_id: userId,
                 status: 'Draft',
-                admin_status: 'Draft',
+                admin_status: mode === 'live' ? 'Live' : 'Draft', // Set to Live if mode is live, otherwise Draft
 
                 // Basic Info
                 part_name: partName,
@@ -249,7 +250,7 @@ export async function updateParentStatus(parentId: string) {
         if (allClosed && children.length > 0) {
             newStatus = 'Closed';
         } else if (anyLive) {
-            newStatus = 'Live Running';
+            newStatus = 'Live';  // Keep as 'Live', not 'Live Running' - that's only for official orders
         }
 
         await supabase
@@ -263,5 +264,112 @@ export async function updateParentStatus(parentId: string) {
     } catch (error) {
         console.error("Update Parent Status Error:", error);
         return { error: 'Failed to update parent status' };
+    }
+}
+
+// Move Approved Order to Official Running Orders
+export async function moveToOfficialOrders(rfqId: string) {
+    try {
+        const supabase = await createClient();
+
+        // 1. Fetch RFQ details to get buyer_id, quote_price, and rfq_number
+        const { data: rfq, error: rfqError } = await supabase
+            .from("rfqs")
+            .select("id, rfq_number, user_id, quote_price, quote_lead_time, admin_status")
+            .eq("id", rfqId)
+            .single();
+
+        if (rfqError || !rfq) {
+            console.error("Error fetching RFQ:", rfqError);
+            return { error: "RFQ not found." };
+        }
+
+        // 2. Find the accepted supplier quote (the one that was sent to buyer)
+        // We need to find which supplier's quote was accepted
+        // The quote_price in rfq table should match the supplier's quote
+        const { data: supplierQuote, error: quoteError } = await supabase
+            .from("supplier_quotes")
+            .select("supplier_id, price, lead_time")
+            .eq("rfq_id", rfqId)
+            .eq("price", rfq.quote_price)
+            .single();
+
+        if (quoteError || !supplierQuote) {
+            console.error("Error finding supplier quote:", quoteError);
+            return { error: "Could not find accepted supplier quote." };
+        }
+
+        // 3. Generate order number
+        const { count, error: countError } = await supabase
+            .from("orders")
+            .select("*", { count: 'exact', head: true });
+
+        if (countError) {
+            console.error("Error counting orders:", countError);
+            return { error: "Failed to generate order number." };
+        }
+
+        const orderNumber = `ORD-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(4, '0')}`;
+
+        // 4. Create order entry
+        const { error: orderError } = await supabase
+            .from("orders")
+            .insert({
+                order_number: orderNumber,
+                rfq_id: rfqId,
+                buyer_id: rfq.user_id,
+                supplier_id: supplierQuote.supplier_id,
+                status: "In Progress",
+                currency: "INR",
+                total_value: rfq.quote_price || 0,
+                created_at: new Date().toISOString()
+            });
+
+        if (orderError) {
+            console.error("Error creating order:", orderError);
+            return { error: "Failed to create order entry." };
+        }
+
+        // 5. Update RFQ admin_status to 'Live Running' (correct ENUM value)
+        const { error: updateError } = await supabase
+            .from("rfqs")
+            .update({
+                admin_status: "Live Running",  // Changed from "Running" to match ENUM
+                updated_at: new Date().toISOString()
+            })
+            .eq("id", rfqId);
+
+        if (updateError) {
+            console.error("Error updating RFQ status:", updateError);
+            return { error: "Failed to update RFQ status." };
+        }
+
+        // 6. Update supplier quote status to 'Approved' so it appears in supplier's My RFQs → Approved tab
+        const { error: quoteUpdateError } = await supabase
+            .from("supplier_quotes")
+            .update({
+                status: "Approved"
+            })
+            .eq("rfq_id", rfqId)
+            .eq("supplier_id", supplierQuote.supplier_id);
+
+        if (quoteUpdateError) {
+            console.error("Error updating supplier quote status:", quoteUpdateError);
+            // Don't return error, this is not critical
+        }
+
+        console.log(`[ORDER] Created order ${orderNumber} for RFQ ${rfq.rfq_number}`);
+
+        // 6. Revalidate all relevant paths
+        revalidatePath("/admin/buyers/rfqs");
+        revalidatePath("/admin/buyers/orders");
+        revalidatePath("/dashboard/supplier/my-rfqs");
+        revalidatePath("/dashboard/supplier/orders");
+
+        return { success: "Order moved to official running orders successfully!" };
+
+    } catch (error) {
+        console.error("Move to Official Orders Error:", error);
+        return { error: "Failed to move order. Please try again." };
     }
 }

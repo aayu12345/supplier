@@ -44,7 +44,7 @@ export default function MarketplacePage() {
             let query = supabase
                 .from("rfqs")
                 .select("*")
-                .in("admin_status", ["Live", "Live Running", "Quoted"]);
+                .in("admin_status", ["Live", "Quoted"]);  // Exclude "Live Running" - those are official orders
 
             // Only exclude if there are quoted RFQs
             if (quotedIds.length > 0) {

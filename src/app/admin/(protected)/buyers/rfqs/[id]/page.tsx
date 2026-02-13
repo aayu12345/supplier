@@ -7,6 +7,7 @@ import { ArrowLeft, Download, Save, CheckCircle, CheckCircle2, AlertCircle, Shop
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import CreateSubRFQModal from "@/components/admin/CreateSubRFQModal";
+import { moveToOfficialOrders } from "@/app/admin/actions";
 
 // Types matching DB
 type AdminRFQDetail = {
@@ -78,6 +79,7 @@ export default function AdminRFQDetailPage() {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
+    const [modalMode, setModalMode] = useState<'draft' | 'live'>('draft');
 
     // Existing State
     const [quotes, setQuotes] = useState<SupplierQuote[]>([]);
@@ -324,6 +326,22 @@ export default function AdminRFQDetailPage() {
         }
     };
 
+    const handleMoveToOfficialOrders = async () => {
+        if (!rfq) return;
+        if (!confirm("Move this order to official running orders?")) return;
+
+        setSaving(true);
+        const result = await moveToOfficialOrders(rfq.id);
+        setSaving(false);
+
+        if (result.error) {
+            alert(result.error);
+        } else {
+            alert(result.success);
+            router.push("/admin/buyers/orders");
+        }
+    };
+
     const onSubmitNegotiation = async (data: any) => {
         if (!rfq) return;
         // Admin sending a new counter offer
@@ -457,12 +475,26 @@ export default function AdminRFQDetailPage() {
                                             <td className="px-4 py-3">{item.quantity}</td>
                                             <td className="px-4 py-3">₹{item.target_price || '-'}</td>
                                             <td className="px-4 py-3 text-right">
-                                                <button
-                                                    onClick={() => handleCreateSubRfq(item)}
-                                                    className="bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-xs"
-                                                >
-                                                    Create Sub-RFQ
-                                                </button>
+                                                <div className="flex gap-2 justify-end">
+                                                    <button
+                                                        onClick={() => {
+                                                            setModalMode('draft');
+                                                            handleCreateSubRfq(item);
+                                                        }}
+                                                        className="bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-xs"
+                                                    >
+                                                        Create Sub-RFQ
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setModalMode('live');
+                                                            handleCreateSubRfq(item);
+                                                        }}
+                                                        className="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 text-xs"
+                                                    >
+                                                        Go Live to Suppliers
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -488,6 +520,7 @@ export default function AdminRFQDetailPage() {
                         parentRfqNumber={rfq.rfq_number}
                         userId={rfq.user_id}
                         itemData={selectedItem}
+                        mode={modalMode}
                     />
                 )}
 
@@ -880,8 +913,12 @@ export default function AdminRFQDetailPage() {
                                 <button className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2">
                                     Upload PI
                                 </button>
-                                <button className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-bold shadow-lg shadow-green-200">
-                                    Move to Official Orders
+                                <button
+                                    onClick={handleMoveToOfficialOrders}
+                                    disabled={saving}
+                                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-bold shadow-lg shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {saving ? "Moving..." : "Move to Official Orders"}
                                 </button>
                             </div>
                         </div>

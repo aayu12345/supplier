@@ -11,9 +11,10 @@ type CreateSubRFQModalProps = {
     parentRfqNumber: string;
     userId: string;
     itemData?: any;
+    mode?: 'draft' | 'live'; // draft = save as draft, live = make live to suppliers
 };
 
-export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfqNumber, userId, itemData }: CreateSubRFQModalProps) {
+export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfqNumber, userId, itemData, mode = 'draft' }: CreateSubRFQModalProps) {
     const [loading, setLoading] = useState(false);
     const [file, setFile] = useState<File | null>(null);
 
@@ -30,6 +31,7 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
         formData.append("parentRfqNumber", parentRfqNumber);
         formData.append("userId", userId);
         formData.append("rfqType", 'single');
+        formData.append("mode", mode); // Pass draft or live mode
 
         // If a new file is selected, it will be in formData as 'drawing'
         // If not, and we want to keep the old one, we might need to handle that in backend
@@ -47,7 +49,10 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
         if (result.error) {
             alert(result.error);
         } else {
-            alert("Sub-RFQ Draft Created Successfully!");
+            const successMessage = mode === 'live'
+                ? "Sub-RFQ Created and Made Live to Suppliers Successfully!"
+                : "Sub-RFQ Draft Created Successfully!";
+            alert(successMessage);
             onClose();
             window.location.reload();
         }
@@ -276,14 +281,14 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="bg-blue-700 text-white font-bold text-base px-10 py-3 rounded-lg hover:bg-blue-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center gap-2"
+                                className={`${mode === 'live' ? 'bg-green-700 hover:bg-green-800' : 'bg-blue-700 hover:bg-blue-800'} text-white font-bold text-base px-10 py-3 rounded-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center gap-2`}
                             >
                                 {loading ? (
-                                    "Saving Draft..."
+                                    mode === 'live' ? "Making Live..." : "Saving Draft..."
                                 ) : (
                                     <>
                                         <Save className="h-5 w-5" />
-                                        Save as Draft
+                                        {mode === 'live' ? 'Make Live to Suppliers' : 'Save as Draft'}
                                     </>
                                 )}
                             </button>

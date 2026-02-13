@@ -107,7 +107,7 @@ export default function AdminRFQsPage() {
             if (activeTab === "New") {
                 query = query.in("admin_status", ["New", "Drafts Created"]);
             } else if (activeTab === "Live") {
-                query = query.in("admin_status", ["Live", "Live Running"]);
+                query = query.eq("admin_status", "Live");  // Only show "Live", not "Live Running"
             } else {
                 query = query.eq("admin_status", activeTab);
             }

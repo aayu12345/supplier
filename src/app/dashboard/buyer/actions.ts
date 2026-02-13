@@ -189,6 +189,7 @@ export async function approveQuote(rfqId: string) {
     console.log(`[EMAIL TRIGGER] Sending Order Confirmed Alert to Admin for RFQ ID: ${rfqId}`);
 
     revalidatePath("/dashboard/buyer/quotes");
+    revalidatePath("/admin/buyers/rfqs"); // Also refresh admin's buyer management page
     return { success: "Quote accepted! implementation details moved to 'My Orders'." };
 }
 
