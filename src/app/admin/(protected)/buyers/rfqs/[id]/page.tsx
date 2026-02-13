@@ -851,8 +851,8 @@ export default function AdminRFQDetailPage() {
                         </div>
                     )}
 
-                    {/* STATE: SENT TO BUYER / REJECTED -> NEGOTIATION */}
-                    {(['Sent to Buyer', 'Rejected', 'Approved'].includes(rfq.admin_status)) && (
+                    {/* STATE: SENT TO BUYER / NEGOTIATION / REJECTED -> NEGOTIATION */}
+                    {(['Sent to Buyer', 'Negotiation', 'Rejected', 'Approved'].includes(rfq.admin_status)) && (
                         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[500px]">
                             <h2 className="text-lg font-bold mb-4 border-b pb-2">Negotiation History</h2>
 
@@ -874,8 +874,8 @@ export default function AdminRFQDetailPage() {
                                 ))}
                             </div>
 
-                            {/* Negotiation Input (Only if not approved) */}
-                            {rfq.admin_status !== 'Approved' && (
+                            {/* Negotiation Input (Only if not approved and in negotiation phase) */}
+                            {(rfq.admin_status === 'Sent to Buyer' || rfq.admin_status === 'Negotiation') && (
                                 <form onSubmit={handleSubmitNeg(onSubmitNegotiation)} className="border-t pt-4">
                                     <div className="flex items-end gap-2">
                                         <div className="flex-1 space-y-2">

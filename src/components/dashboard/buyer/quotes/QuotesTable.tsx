@@ -4,6 +4,7 @@ import { FileText, File, Calendar, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import QuoteDetailModal from "./QuoteDetailModal";
+import Link from "next/link";
 
 // RFQ Type matching Database
 export type RFQ = {
@@ -172,6 +173,13 @@ export default function QuotesTable() {
                                         <td className="px-6 py-4">
                                             {rfq.status === 'Pending' ? (
                                                 <button className="text-gray-400 hover:text-gray-600 font-medium cursor-default">Pending</button>
+                                            ) : rfq.status === 'Negotiation' ? (
+                                                <Link
+                                                    href={`/dashboard/buyer/quotes/${rfq.id}`}
+                                                    className="text-green-600 hover:text-green-800 font-medium bg-green-50 px-3 py-1.5 rounded-md hover:bg-green-100 transition-colors inline-block"
+                                                >
+                                                    Negotiate
+                                                </Link>
                                             ) : (
                                                 <button
                                                     onClick={() => setSelectedQuote(rfq)}

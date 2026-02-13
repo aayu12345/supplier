@@ -199,3 +199,35 @@ export async function signOut() {
     revalidatePath("/");
     redirect("/start/buyer");
 }
+
+// Start Negotiation - Buyer clicks "Negotiate" button
+export async function startNegotiation(rfqId: string) {
+    try {
+        const supabase = await createClient();
+
+        // Update BOTH status and admin_status to 'Negotiation'
+        // status: for buyer dashboard display
+        // admin_status: for admin dashboard filtering
+        const { error } = await supabase
+            .from("rfqs")
+            .update({
+                status: 'Negotiation',
+                admin_status: 'Negotiation'
+            })
+            .eq("id", rfqId);
+
+        if (error) {
+            console.error("Error starting negotiation:", error);
+            return { error: "Failed to start negotiation." };
+        }
+
+        // Revalidate both buyer and admin paths
+        revalidatePath("/dashboard/buyer/quotes");
+        revalidatePath("/admin/buyers/rfqs");
+
+        return { success: true };
+    } catch (error) {
+        console.error("Start Negotiation Error:", error);
+        return { error: "Failed to start negotiation." };
+    }
+}

@@ -30,8 +30,19 @@ export default function QuoteDetailModal({ isOpen, onClose, quote }: QuoteDetail
         }
     };
 
-    const handleNegotiate = () => {
-        alert("Negotiation request sent to Admin.");
+    const handleNegotiate = async () => {
+        // Call Server Action to start negotiation
+        const { startNegotiation } = await import("@/app/dashboard/buyer/actions");
+        const result = await startNegotiation(quote.id);
+
+        if (result?.error) {
+            alert(result.error);
+        } else {
+            alert("Negotiation started! Redirecting to Negotiation tab...");
+            onClose();
+            // Redirect to Negotiation tab
+            window.location.href = "/dashboard/buyer/quotes?tab=Negotiation";
+        }
     };
 
     return (

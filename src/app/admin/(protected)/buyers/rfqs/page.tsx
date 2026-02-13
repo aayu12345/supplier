@@ -11,7 +11,7 @@ type AdminRFQ = {
     rfq_number: string;
     file_name: string;
     created_at: string;
-    admin_status: 'New' | 'Live' | 'Quoted' | 'Sent to Buyer' | 'Approved' | 'Rejected';
+    admin_status: 'New' | 'Live' | 'Quoted' | 'Sent to Buyer' | 'Negotiation' | 'Approved' | 'Rejected';
     profiles: {
         name: string;
         company_name: string;
@@ -40,7 +40,7 @@ type AdminRFQ = {
     components_count?: number;
 };
 
-const TABS = ["New", "Live", "Quoted", "Sent to Buyer", "Approved", "Rejected"];
+const TABS = ["New", "Live", "Quoted", "Sent to Buyer", "Negotiation", "Approved", "Rejected"];
 
 export default function AdminRFQsPage() {
     const searchParams = useSearchParams();
