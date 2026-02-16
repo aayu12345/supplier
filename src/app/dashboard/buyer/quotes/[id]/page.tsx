@@ -326,7 +326,7 @@ export default function BuyerNegotiationPage() {
                                     <input
                                         {...register("price")}
                                         type="number"
-                                        step="0.01"
+                                        step="any"
                                         placeholder="Your counter-offer (₹) - optional"
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     />

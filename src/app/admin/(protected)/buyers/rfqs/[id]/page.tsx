@@ -936,6 +936,7 @@ export default function AdminRFQDetailPage() {
                                             <input
                                                 {...registerNeg("price")}
                                                 type="number"
+                                                step="any"
                                                 placeholder="New Price (₹)"
                                                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
                                                 defaultValue={rfq.quote_price}
