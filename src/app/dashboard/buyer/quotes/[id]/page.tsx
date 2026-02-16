@@ -40,11 +40,46 @@ export default function BuyerNegotiationPage() {
     const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
     const [loading, setLoading] = useState(true);
     const supabase = createClient();
+    const [channel, setChannel] = useState<any>(null);
 
     const { register, handleSubmit, reset } = useForm();
 
     useEffect(() => {
         fetchData();
+
+        // Realtime Broadcast Channel (WebSockets)
+        // Uses a shared room ID for both Buyer and Admin
+        const newChannel = supabase.channel(`room-${rfqId}`);
+
+        newChannel
+            .on(
+                'broadcast',
+                { event: 'new-message' },
+                (payload) => {
+                    console.log("WebSocket message received:", payload);
+                    const newMessage = payload.payload as Negotiation;
+
+                    setNegotiations((prev) => {
+                        // Avoid duplicates if we already have this ID
+                        if (prev.some(m => m.id === newMessage.id)) return prev;
+                        return [...prev, newMessage];
+                    });
+
+                    // Update Current Offer if price is included
+                    if (newMessage.price) {
+                        setRfq((prev) => prev ? ({ ...prev, quote_price: newMessage.price }) : null);
+                    }
+                }
+            )
+            .subscribe((status) => {
+                console.log("WebSocket Status:", status);
+            });
+
+        setChannel(newChannel);
+
+        return () => {
+            supabase.removeChannel(newChannel);
+        };
     }, [rfqId]);
 
     const fetchData = async () => {
@@ -79,19 +114,34 @@ export default function BuyerNegotiationPage() {
 
     const onSubmitMessage = async (data: any) => {
         try {
-            const { error } = await supabase
+            const messageData = {
+                rfq_id: rfqId,
+                sender_role: "buyer",
+                price: data.price ? Number(data.price) : null,
+                notes: data.notes
+            };
+
+            // 1. Save to Database
+            const { data: insertedMsg, error } = await supabase
                 .from("rfq_negotiations")
-                .insert({
-                    rfq_id: rfqId,
-                    sender_role: "buyer",
-                    price: data.price ? Number(data.price) : null,
-                    notes: data.notes
-                });
+                .insert(messageData)
+                .select()
+                .single();
 
             if (error) throw error;
 
-            // Refresh negotiations
-            fetchData();
+            // 2. Broadcast via WebSocket (Instant)
+            if (channel) {
+                await channel.send({
+                    type: 'broadcast',
+                    event: 'new-message',
+                    payload: insertedMsg
+                });
+            }
+
+            // 3. Update Local State Immediately
+            setNegotiations(prev => [...prev, insertedMsg]);
+
             reset();
         } catch (error) {
             console.error("Error sending message:", error);
@@ -249,8 +299,8 @@ export default function BuyerNegotiationPage() {
                                         >
                                             <div
                                                 className={`max-w-[70%] rounded-lg p-4 ${msg.sender_role === 'buyer'
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-100 text-gray-900'
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-100 text-gray-900'
                                                     }`}
                                             >
                                                 <p className="text-xs font-bold mb-1 opacity-75">

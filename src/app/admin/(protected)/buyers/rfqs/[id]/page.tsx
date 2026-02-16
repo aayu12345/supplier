@@ -88,17 +88,48 @@ export default function AdminRFQDetailPage() {
     const [saving, setSaving] = useState(false);
     const supabase = createClient();
 
-    // Forms
     const { register: registerLive, handleSubmit: handleSubmitLive, setValue: setValueLive } = useForm();
     const { register: registerNeg, handleSubmit: handleSubmitNeg, reset: resetNeg } = useForm();
+    const [channel, setChannel] = useState<any>(null);
 
     useEffect(() => {
-        if (params.id) fetchData();
+        if (!params.id) return;
+
+        fetchData();
+
+        // Realtime Broadcast Channel (WebSockets)
+        // Uses a shared room ID for both Buyer and Admin
+        const newChannel = supabase.channel(`room-${params.id}`);
+
+        newChannel
+            .on(
+                'broadcast',
+                { event: 'new-message' },
+                (payload) => {
+                    console.log("WebSocket message received:", payload);
+                    const newMessage = payload.payload as NegotiationMessage;
+                    setNegotiations((prev) => {
+                        // Avoid duplicates
+                        if (prev.some(m => m.id === newMessage.id)) return prev;
+                        return [...prev, newMessage];
+                    });
+                }
+            )
+            .subscribe((status) => {
+                console.log("WebSocket Status:", status);
+            });
+
+        setChannel(newChannel);
+
+        return () => {
+            supabase.removeChannel(newChannel);
+        };
     }, [params.id]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
+            // ... (rest of fetchData logic remains same)
             // 1. Fetch Requesting RFQ
             const { data: rfqData, error: rfqError } = await supabase
                 .from("rfqs")
@@ -169,7 +200,7 @@ export default function AdminRFQDetailPage() {
 
             // Pre-fill Forms with ALL saved data
             if (rfqData) {
-                // Basic fields
+                // ... prefill logic
                 setValueLive("weight_per_piece", rfqData.weight_per_piece || 0);
                 setValueLive("material_admin", rfqData.material_admin || "");
                 setValueLive("finish", rfqData.finish || "");
@@ -205,7 +236,10 @@ export default function AdminRFQDetailPage() {
 
     // --- Actions ---
 
+    // ... (onSubmitLive remains same)
+
     const onSubmitLive = async (formData: any) => {
+        // ... (existing logic)
         if (!rfq) return;
         setSaving(true);
         try {
@@ -260,6 +294,7 @@ export default function AdminRFQDetailPage() {
         }
     };
 
+    // ... (handleMockQuote remains same)
     const handleMockQuote = async () => {
         if (!rfq) return;
         const price = prompt("Enter Mock Supplier Price:");
@@ -286,31 +321,40 @@ export default function AdminRFQDetailPage() {
         if (!rfq) return;
         if (!confirm(`Send Quote of ${quote.price} to Buyer?`)) return;
 
-        // 1. Update RFQ with selected price and status
+        // 1. Update RFQ 
         const validUntil = new Date();
-        validUntil.setDate(validUntil.getDate() + 7); // Valid for 7 days
+        validUntil.setDate(validUntil.getDate() + 7);
 
         const { error } = await supabase
             .from("rfqs")
             .update({
                 admin_status: 'Sent to Buyer',
-                status: 'Quoted', // Update buyer-facing status so they can see it
+                status: 'Quoted',
                 quote_price: quote.price,
-                quote_lead_time: rfq.lead_time_admin || quote.lead_time, // Use admin's lead time, fallback to supplier's
-                quote_valid_until: validUntil.toISOString().split('T')[0] // Format as YYYY-MM-DD
+                quote_lead_time: rfq.lead_time_admin || quote.lead_time,
+                quote_valid_until: validUntil.toISOString().split('T')[0]
             })
             .eq("id", rfq.id);
 
-        // 2. Add initial negotiation entry (Admin's offer)
-        await supabase.from("rfq_negotiations").insert({
+        // 2. Add initial negotiation entry (Admin's offer) and BROADCAST
+        const { data: insertedMsg, error: msgError } = await supabase.from("rfq_negotiations").insert({
             rfq_id: rfq.id,
             sender_role: 'admin',
             price: quote.price,
             notes: `Initial offer sent to buyer based on ${quote.supplier_name}'s quote.`
-        });
+        }).select().single();
 
-        if (error) alert("Error: " + error.message);
+        if (error || msgError) alert("Error: " + (error?.message || msgError?.message));
         else {
+            // BROADCAST
+            if (channel) {
+                await channel.send({
+                    type: 'broadcast',
+                    event: 'new-message',
+                    payload: insertedMsg
+                });
+            }
+
             // Log Activity
             const { logActivity } = await import("@/lib/actions/timeline");
             await logActivity(
@@ -320,12 +364,11 @@ export default function AdminRFQDetailPage() {
                 { rfq_id: rfq.id, quote_id: quote.id, price: quote.price }
             );
 
-            // alert("Quote Sent to Buyer!");
-            // fetchData();
             router.push("/admin/buyers/rfqs?tab=Sent to Buyer");
         }
     };
 
+    // ... (handleMoveToOfficialOrders remains same)
     const handleMoveToOfficialOrders = async () => {
         if (!rfq) return;
         if (!confirm("Move this order to official running orders?")) return;
@@ -345,20 +388,31 @@ export default function AdminRFQDetailPage() {
     const onSubmitNegotiation = async (data: any) => {
         if (!rfq) return;
         // Admin sending a new counter offer
-        const { error } = await supabase.from("rfq_negotiations").insert({
+        const { data: insertedMsg, error } = await supabase.from("rfq_negotiations").insert({
             rfq_id: rfq.id,
             sender_role: 'admin',
             price: Number(data.price),
             notes: data.notes
-        });
+        }).select().single();
 
-        // Update main RFQ price too, stays 'Sent to Buyer'
+        // Update main RFQ price too
         await supabase.from("rfqs").update({ quote_price: Number(data.price) }).eq("id", rfq.id);
 
         if (error) alert("Error sending message");
         else {
+            // BROADCAST
+            if (channel) {
+                await channel.send({
+                    type: 'broadcast',
+                    event: 'new-message',
+                    payload: insertedMsg
+                });
+            }
+
+            // Update Local
+            setNegotiations((prev) => [...prev, insertedMsg]);
+
             resetNeg();
-            fetchData();
         }
     };
 
