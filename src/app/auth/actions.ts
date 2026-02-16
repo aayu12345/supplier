@@ -12,7 +12,7 @@ export async function login(formData: FormData) {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
     });
@@ -22,8 +22,9 @@ export async function login(formData: FormData) {
         return { error: error.message };
     }
 
+    const user = data.user;
+
     // Fetch user profile to check role
-    const { data: { user } } = await supabase.auth.getUser();
     if (user) {
         const { data: profile } = await supabase
             .from('profiles')
@@ -37,10 +38,8 @@ export async function login(formData: FormData) {
         // 1. If explicit role requested and user HAS that role, go there
         if (loginRole && roles.includes(loginRole)) {
             if (loginRole === 'supplier') {
-                revalidatePath("/dashboard/supplier");
                 redirect("/dashboard/supplier");
             } else if (loginRole === 'buyer') {
-                revalidatePath("/dashboard/buyer");
                 redirect("/dashboard/buyer");
             } else if (loginRole === 'admin') {
                 redirect("/admin/dashboard");
@@ -49,7 +48,6 @@ export async function login(formData: FormData) {
 
         // 2. Fallback Priority (if no specific role requested or invalid request)
         if (roles.includes('supplier')) {
-            revalidatePath("/dashboard/supplier");
             redirect("/dashboard/supplier");
         } else if (roles.includes('admin')) {
             redirect("/admin/dashboard");
