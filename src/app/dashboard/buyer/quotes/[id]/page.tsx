@@ -66,8 +66,9 @@ export default function BuyerNegotiationPage() {
                     });
 
                     // Update Current Offer if price is included
-                    if (newMessage.price) {
-                        setRfq((prev) => prev ? ({ ...prev, quote_price: newMessage.price }) : null);
+                    if (newMessage.price !== null && newMessage.price !== undefined) {
+                        const newPrice = newMessage.price;
+                        setRfq((prev) => prev ? ({ ...prev, quote_price: newPrice }) : null);
                     }
                 }
             )
