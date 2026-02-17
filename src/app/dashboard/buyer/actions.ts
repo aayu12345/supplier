@@ -170,11 +170,59 @@ export async function submitRFQ(formData: FormData) {
 export async function approveQuote(rfqId: string) {
     const supabase = await createClient();
 
-    const { error } = await supabase
+    // 1. Fetch RFQ details
+    const { data: rfq, error: rfqError } = await supabase
+        .from("rfqs")
+        .select("*")
+        .eq("id", rfqId)
+        .single();
+
+    if (rfqError || !rfq) {
+        return { error: "RFQ not found." };
+    }
+
+    // 2. Find the WINNING Supplier Quote (matching price)
+    // In a real scenario, we might store 'winning_quote_id', but here we match price 
+    // or arguably the Admin's 'Sent to Buyer' status implies the last negotiation is the price.
+    // However, existing logic in Admin actions uses 'quote_price' to find the supplier quote.
+    const { data: supplierQuote } = await supabase
+        .from("supplier_quotes")
+        .select("*")
+        .eq("rfq_id", rfqId)
+        .eq("price", rfq.quote_price)
+        .maybeSingle();
+
+    // 3. Generate Order Number
+    const { count } = await supabase.from("orders").select("*", { count: 'exact', head: true });
+    const orderNumber = `ORD-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(4, '0')}`;
+
+    // 4. Create Order Entry (For Admin Dashboard)
+    const { error: orderError } = await supabase.from("orders").insert({
+        order_number: orderNumber,
+        rfq_id: rfqId,
+        buyer_id: rfq.user_id,
+        supplier_id: supplierQuote?.supplier_id, // Can be null if manual admin price
+        status: "In Progress",
+        currency: "INR",
+        total_value: rfq.quote_price || 0,
+        created_at: new Date().toISOString()
+    });
+
+    if (orderError) {
+        console.error("Error creating order:", orderError);
+        return { error: "Failed to create official order." };
+    }
+
+    // 5. Update RFQ Status (For Buyer Dashboard)
+    // Use Admin Client to bypass RLS for status updates
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const supabaseAdmin = createAdminClient();
+
+    const { error } = await supabaseAdmin
         .from("rfqs")
         .update({
             status: "Approved",
-            admin_status: "Approved", // Also update admin_status so it appears in admin's Approved tab
+            admin_status: "Live Running", // Matches Admin's view logic
             updated_at: new Date().toISOString()
         })
         .eq("id", rfqId);
@@ -184,13 +232,24 @@ export async function approveQuote(rfqId: string) {
         return { error: "Failed to approve quote." };
     }
 
+    // 6. Update Supplier Quote Status
+    if (supplierQuote) {
+        await supabaseAdmin
+            .from("supplier_quotes")
+            .update({ status: "Approved" })
+            .eq("id", supplierQuote.id);
+    }
+
     // Mock Notification
     console.log(`[EMAIL TRIGGER] Sending PO Request to Buyer for RFQ ID: ${rfqId}`);
     console.log(`[EMAIL TRIGGER] Sending Order Confirmed Alert to Admin for RFQ ID: ${rfqId}`);
 
     revalidatePath("/dashboard/buyer/quotes");
-    revalidatePath("/admin/buyers/rfqs"); // Also refresh admin's buyer management page
-    return { success: "Quote accepted! implementation details moved to 'My Orders'." };
+    revalidatePath("/dashboard/buyer/orders"); // Refresh Buyer Orders
+    revalidatePath("/admin/buyers/rfqs");
+    revalidatePath("/admin/buyers/orders"); // Refresh Admin Orders
+
+    return { success: "Quote accepted! Order moved to 'Running Orders'." };
 }
 
 export async function signOut() {

@@ -159,7 +159,7 @@ export default function BuyerNegotiationPage() {
                 alert(result.error);
             } else {
                 alert("Quote accepted! Redirecting...");
-                router.push("/dashboard/buyer/quotes");
+                router.push("/dashboard/buyer/orders");
             }
         } catch (error) {
             console.error("Error accepting offer:", error);
