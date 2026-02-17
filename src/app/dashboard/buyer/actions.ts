@@ -33,7 +33,7 @@ export async function submitRFQ(formData: FormData) {
         // 2. Start Parallel Operations (Upload & Auth)
 
         // Task A: Upload File (Only if exists)
-        let uploadPromise = Promise.resolve(null);
+        let uploadPromise: Promise<string | null> = Promise.resolve(null);
         if (file) {
             const fileExt = file.name.split(".").pop();
             fileName = `${rfqNumber}_${Date.now()}.${fileExt}`;
