@@ -40,6 +40,9 @@ export async function submitRFQ(formData: FormData) {
             const filePath = `${filePathBase}/${fileName}`;
 
             // @ts-ignore
+            const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+            console.log("AVAILABLE BUCKETS:", buckets?.map(b => b.name));
+
             uploadPromise = supabaseAdmin.storage
                 .from("rfq-drawings")
                 .upload(filePath, file)

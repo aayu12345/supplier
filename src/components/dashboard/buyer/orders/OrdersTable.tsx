@@ -15,8 +15,10 @@ export type RFQ = {
     status: string; // 'Approved' for orders
     order_status?: "In Progress" | "Dispatched" | "Delivered";
     po_file_url?: string;
+    pi_file_url?: string;
     created_at: string;
     updated_at: string;
+    order_id?: string; // Unique Order UUID from 'orders' table
     // Extended fields for UI display
     contact_name?: string;
     contact_email?: string;
@@ -44,24 +46,46 @@ export default function OrdersTable() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Debugging
-            console.log("Current User:", user.id);
-
-            // Fetch RFQs that are "Approved" (which means they are Orders)
+            // Fetch ORDERS directly (this is the single source of truth for running orders)
+            // Join with RFQs to get file name and rfq number
             const { data, error } = await supabase
-                .from("rfqs")
-                .select("*")
-                .eq("user_id", user.id)
-                .eq("status", "Approved")
-                .order("updated_at", { ascending: false });
-
-            console.log("Fetched Orders:", data);
+                .from("orders")
+                .select(`
+                    *,
+                    rfqs:rfq_id (
+                        file_name,
+                        rfq_number,
+                        quantity,
+                        lead_time
+                    )
+                `)
+                .eq("buyer_id", user.id)
+                .neq("status", "Completed") // For "Running Orders" tab
+                .order("created_at", { ascending: false });
 
             if (error) {
                 console.error("Supabase Error:", error);
                 throw error;
             }
-            setOrders(data as unknown as RFQ[]);
+
+            // Map flattened structure for table
+            const mappedOrders = data.map((order: any) => ({
+                id: order.rfq_id, // Keep using RFQ ID for navigation for now
+                order_id: order.id, // UNIQUE ID from 'orders' table for React Key
+
+                rfq_number: order.order_number, // Show Order # as primary
+                file_name: order.rfqs?.file_name,
+                quantity: order.rfqs?.quantity,
+                lead_time: order.rfqs?.lead_time,
+                status: "Approved", // It's an order, so RFQ is approved
+                order_status: order.status,
+                po_file_url: order.po_url, // Map po_url from orders table
+                pi_file_url: order.pi_url, // Map pi_url from orders table
+                created_at: order.created_at,
+                updated_at: order.created_at
+            }));
+
+            setOrders(mappedOrders as unknown as RFQ[]);
         } catch (error) {
             console.error("Error fetching orders:", error);
         } finally {
@@ -130,7 +154,7 @@ export default function OrdersTable() {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {filteredOrders.map((order) => (
-                                    <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                                    <tr key={order.order_id || order.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-gray-900">
                                             {order.rfq_number}
                                         </td>
@@ -160,7 +184,7 @@ export default function OrdersTable() {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
                                                 <Link
-                                                    href={`/dashboard/buyer/orders/${order.id}`}
+                                                    href={`/dashboard/buyer/orders/${order.order_id}`}
                                                     className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium bg-blue-50 px-3 py-1.5 rounded-md hover:bg-blue-100 transition-colors"
                                                 >
                                                     <Eye className="h-3 w-3" /> View

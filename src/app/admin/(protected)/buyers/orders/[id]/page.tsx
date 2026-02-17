@@ -97,21 +97,39 @@ export default function AdminOrderDetailPage() {
         }
     };
 
-    const handleUploadDoc = async (field: 'po_url' | 'pi_url' | 'final_quote_url') => {
-        // Mock upload for now - in production this would be a file picker + storage upload
-        const url = prompt(`Enter URL for ${field.replace('_url', '').toUpperCase()} (or "mock"):`, "https://example.com/doc.pdf");
-        if (!url) return;
+    const uploadFile = async (file: File, field: 'po_url' | 'pi_url' | 'final_quote_url') => {
+        if (file.size > 20 * 1024 * 1024) {
+            alert("File size exceeds 20MB limit.");
+            return;
+        }
 
-        const { error } = await supabase
-            .from("orders")
-            .update({ [field]: url })
-            .eq("id", params.id);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${field.replace('_url', '')}_${params.id}_${Date.now()}.${fileExt}`;
+            const filePath = `orders/${params.id}/${fileName}`;
 
-        if (error) alert("Error uploading: " + error.message);
-        else {
-            // Trigger Payment Record Creation if PI is uploaded
+            // Upload via Standard Client (Admin user has permissions)
+            const { error: uploadError } = await supabase.storage
+                .from('rfq-drawings') // Using shared bucket
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('rfq-drawings')
+                .getPublicUrl(filePath);
+
+            // Update Database
+            const { error: dbError } = await supabase
+                .from("orders")
+                .update({ [field]: publicUrl })
+                .eq("id", params.id);
+
+            if (dbError) throw dbError;
+
+            // Trigger post-upload logic (e.g. Payment init for PI)
             if (field === 'pi_url') {
-                const initPayment = confirm("Do you want to initialize the Payment Record for this PI?");
+                const initPayment = confirm("File Uploaded! Do you want to initialize the Payment Record for this PI?");
                 if (initPayment) {
                     const total = Number(prompt("Confirm Total Order Value (USD):", order?.total_value?.toString()));
                     const advancePct = Number(prompt("Advance Percentage (%):", "50"));
@@ -125,13 +143,18 @@ export default function AdminOrderDetailPage() {
                             advance_percentage: advancePct,
                             advance_due_date: dueDate
                         });
-
                         if (payError) alert("Failed to create Payment Record: " + payError.message);
-                        else alert("Payment Record Initialized! Check Payments Dashboard.");
+                        else alert("Payment Record Initialized!");
                     }
                 }
+            } else {
+                alert(`${field === 'po_url' ? 'Purchase Order' : 'Final Quote'} uploaded successfully!`);
             }
-            fetchData();
+
+            fetchData(); // Refresh UI
+        } catch (error: any) {
+            console.error("Upload Error:", error);
+            alert("Upload Failed: " + error.message);
         }
     };
 
@@ -226,9 +249,21 @@ export default function AdminOrderDetailPage() {
                         <Upload className="h-5 w-5 text-gray-400" /> Documents
                     </h2>
                     <div className="grid grid-cols-2 gap-4">
-                        <DocumentCard label="Buyer PO" url={order.po_url} onUpload={() => handleUploadDoc('po_url')} />
-                        <DocumentCard label="Proforma Invoice" url={order.pi_url} onUpload={() => handleUploadDoc('pi_url')} />
-                        <DocumentCard label="Final Quote" url={order.final_quote_url} onUpload={() => handleUploadDoc('final_quote_url')} />
+                        <DocumentCard
+                            label="Buyer PO"
+                            url={order.po_url}
+                            onFileSelect={(f) => uploadFile(f, 'po_url')}
+                        />
+                        <DocumentCard
+                            label="Proforma Invoice"
+                            url={order.pi_url}
+                            onFileSelect={(f) => uploadFile(f, 'pi_url')}
+                        />
+                        <DocumentCard
+                            label="Final Quote"
+                            url={order.final_quote_url}
+                            onFileSelect={(f) => uploadFile(f, 'final_quote_url')}
+                        />
                     </div>
                 </div>
             </div>
@@ -280,20 +315,34 @@ export default function AdminOrderDetailPage() {
     );
 }
 
-function DocumentCard({ label, url, onUpload }: { label: string, url?: string, onUpload: () => void }) {
+function DocumentCard({ label, url, onFileSelect }: { label: string, url?: string, onFileSelect: (f: File) => void }) {
+    const [uploading, setUploading] = useState(false);
+
+    const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.[0]) {
+            setUploading(true);
+            await onFileSelect(e.target.files[0]);
+            setUploading(false);
+            e.target.value = ""; // Reset
+        }
+    };
+
     return (
         <div className="border border-gray-200 rounded-lg p-3 flex items-center justify-between group hover:border-blue-200 transition-colors">
-            <div>
-                <p className="text-xs text-gray-500 uppercase font-semibold">{label}</p>
+            <div className="w-full">
+                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">{label}</p>
                 {url ? (
-                    <a href={url} target="_blank" className="text-sm text-blue-600 hover:underline truncate block max-w-[100px]">View File</a>
+                    <div className="flex items-center justify-between">
+                        <a href={url} target="_blank" className="text-sm text-blue-600 hover:underline truncate max-w-[120px]">View File</a>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                    </div>
                 ) : (
-                    <button onClick={onUpload} className="text-sm text-gray-400 italic hover:text-blue-500 flex items-center gap-1">
-                        <Upload className="h-3 w-3" /> Upload
-                    </button>
+                    <label className="cursor-pointer flex items-center gap-1 text-sm text-gray-400 italic hover:text-blue-500 w-fit">
+                        {uploading ? "Uploading..." : <><Upload className="h-3 w-3" /> Upload File</>}
+                        <input type="file" className="hidden" onChange={handleChange} disabled={uploading} />
+                    </label>
                 )}
             </div>
-            {url && <CheckCircle className="h-4 w-4 text-green-500" />}
         </div>
     );
 }

@@ -138,7 +138,7 @@ export default function QuoteForm({ rfq, costBreakdownEnabled }: { rfq: any; cos
                             )}
 
                             {/* Pricing & Timeline */}
-                            {(rfq.target_price || rfq.lead_time_admin) && (
+                            {(rfq.target_price || rfq.lead_time_admin || rfq.quote_expiry_date) && (
                                 <div className="pt-3 border-t border-gray-100">
                                     <p className="text-xs font-bold text-gray-400 uppercase mb-3">💰 Pricing & Timeline</p>
                                     <div className="space-y-2">
@@ -152,6 +152,12 @@ export default function QuoteForm({ rfq, costBreakdownEnabled }: { rfq: any; cos
                                             <div className="flex justify-between">
                                                 <p className="text-xs text-gray-500">Lead Time</p>
                                                 <p className="text-xs font-bold text-gray-900">{rfq.lead_time_admin}</p>
+                                            </div>
+                                        )}
+                                        {rfq.quote_expiry_date && (
+                                            <div className="flex justify-between">
+                                                <p className="text-xs text-gray-500">Quote Deadline</p>
+                                                <p className="text-xs font-bold text-red-600">{new Date(rfq.quote_expiry_date).toLocaleDateString()}</p>
                                             </div>
                                         )}
                                     </div>

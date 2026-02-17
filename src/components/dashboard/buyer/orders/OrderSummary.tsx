@@ -1,5 +1,6 @@
 import { FileText, Download } from "lucide-react";
 import { RFQ } from "./OrdersTable";
+import OrderDocumentsClient from "./OrderDocumentsClient";
 
 export default function OrderSummary({ order }: { order: RFQ }) {
     return (
@@ -41,45 +42,12 @@ export default function OrderSummary({ order }: { order: RFQ }) {
                 </div>
             </div>
 
-            {/* Documents */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Documentation</h3>
-                <div className="space-y-3">
-
-                    {/* PO */}
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600">
-                                <FileText className="h-4 w-4" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-gray-900">Purchase Order</p>
-                                <p className="text-xs text-gray-500">Provided by You</p>
-                            </div>
-                        </div>
-                        {order.po_file_url ? (
-                            <a href={order.po_file_url} target="_blank" className="text-blue-600 hover:text-blue-700 text-sm font-medium">View</a>
-                        ) : (
-                            <span className="text-xs text-yellow-600 font-medium">Pending</span>
-                        )}
-                    </div>
-
-                    {/* Proforma (Mock for now) */}
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
-                                <FileText className="h-4 w-4" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-gray-900">Proforma Invoice</p>
-                                <p className="text-xs text-gray-500">From TheSupplier</p>
-                            </div>
-                        </div>
-                        <button disabled className="text-gray-400 text-sm font-medium cursor-not-allowed">Generating...</button>
-                    </div>
-
-                </div>
-            </div>
+            {/* Documents - Client Component */}
+            <OrderDocumentsClient
+                orderId={order.id}
+                poUrl={order.po_file_url}
+                piUrl={order.pi_file_url}
+            />
         </div>
     );
 }

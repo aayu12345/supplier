@@ -16,11 +16,23 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     if (!user) redirect("/auth/login");
 
     // Fetch RFQ Details
+    // Fetch ORDER Details (Source of Truth)
     const { data: order, error } = await supabase
-        .from("rfqs")
-        .select("*")
-        .eq("id", id)
-        .eq("user_id", user.id)
+        .from("orders")
+        .select(`
+            *,
+            rfqs:rfq_id (
+                rfq_number,
+                file_name,
+                quantity,
+                lead_time,
+                contact_name,
+                contact_email,
+                contact_phone
+            )
+        `)
+        .eq("id", id) // Match by Unique Order ID (PK)
+        .eq("buyer_id", user.id)
         .single();
 
     console.log("Order Detail Query Result:", { order, error });
@@ -29,10 +41,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         return (
             <div className="p-8 text-red-600 bg-red-50 border border-red-200 rounded-xl m-8">
                 <h1 className="text-2xl font-bold mb-4">Debug: Order Not Found</h1>
-                <p><strong>URL Param ID:</strong> {id}</p>
+                <p><strong>URL Param ID (RFQ ID):</strong> {id}</p>
                 <p><strong>Current User ID:</strong> {user.id}</p>
                 <p><strong>Supabase Error:</strong> {JSON.stringify(error)}</p>
-                <p className="mt-4 text-gray-700">Please verify that the RFQ exists and belongs to this user.</p>
+                <p className="mt-4 text-gray-700">Please verify that the Order exists and belongs to this user.</p>
                 <Link href="/dashboard/buyer/orders" className="text-blue-600 hover:underline mt-4 block">Back to Orders</Link>
             </div>
         );
@@ -41,8 +53,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     // Fetch Timeline
     const { data: timelineData } = await supabase
         .from("order_timeline")
+        // Timeline is linked to ORDER ID, not RFQ ID usually.
+        // Let's check how timeline was inserted. 
+        // In previous code (Admin page), it inserted with order_id.
+        // So we must query by order_id = order.id
         .select("*")
-        .eq("rfq_id", id)
+        .eq("order_id", order.id)
         .order("created_at", { ascending: false });
 
     // Fetch Profile Data for Shipping/Billing Info
@@ -54,14 +70,25 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
     const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "Guest";
 
-    // Merge RFQ contact info with Profile info (RFQ takes precedence if exists, else Profile)
+    // Merge Order/RFQ contact info with Profile info
     const displayOrder = {
         ...order,
-        contact_name: order.contact_name || profile?.contact_person || profile?.full_name || userName,
-        contact_email: order.contact_email || user.email,
-        contact_phone: order.contact_phone || profile?.phone,
+        // Map RFQ fields to top level for components that expect them
+        rfq_number: order.order_number, // Use Order Number as primary display
+        rfq_ref_number: order.rfqs?.rfq_number, // Keep RFQ ref
+        file_name: order.rfqs?.file_name,
+        quantity: order.rfqs?.quantity,
+        lead_time: order.rfqs?.lead_time,
+
+        contact_name: order.rfqs?.contact_name || profile?.contact_person || profile?.full_name || userName,
+        contact_email: order.rfqs?.contact_email || user.email,
+        contact_phone: order.rfqs?.contact_phone || profile?.phone,
         company_name: profile?.company_name,
-        shipping_address: profile?.address
+        shipping_address: profile?.address,
+
+        // Map Document Fields for UI
+        po_file_url: order.po_url,
+        pi_file_url: order.pi_url
     };
 
     return (

@@ -13,6 +13,7 @@ type RFQ = {
     lead_time: string;
     created_at: string;
     type: string;
+    quote_expiry_date?: string; // NEW
 };
 
 export default function MarketplacePage() {
@@ -118,6 +119,12 @@ export default function MarketplacePage() {
                                             <span className="px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
                                                 Live
                                             </span>
+                                            {rfq.quote_expiry_date && (
+                                                <span className="flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                                                    <Calendar className="h-3 w-3" />
+                                                    Exp: {new Date(rfq.quote_expiry_date).toLocaleDateString()}
+                                                </span>
+                                            )}
                                         </div>
                                         <p className="text-gray-900 font-medium">{rfq.file_name}</p>
                                         <div className="flex flex-wrap gap-4 text-sm text-gray-500">

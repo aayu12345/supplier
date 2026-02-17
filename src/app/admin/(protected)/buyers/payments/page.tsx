@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { AlertCircle, CheckCircle, Clock, DollarSign, FileText } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, DollarSign, FileText, X, Save } from "lucide-react";
 import Link from "next/link";
 
 type PaymentRecord = {
@@ -14,10 +14,14 @@ type PaymentRecord = {
     advance_percentage: number;
     advance_status: string;
     advance_due_date: string;
+    advance_paid_date?: string;
+    advance_doc_url?: string;
 
     balance_amount: number;
     balance_status: string;
     balance_due_date: string;
+    balance_paid_date?: string;
+    balance_doc_url?: string;
 
     payment_status: string;
 
@@ -26,12 +30,14 @@ type PaymentRecord = {
         rfqs: { rfq_number: string };
         profiles: { name: string; company_name: string };
     };
+    created_at: string;
 };
 
 export default function PaymentsDashboardPage() {
     const [payments, setPayments] = useState<PaymentRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"advance" | "balance" | "completed">("advance");
+    const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
     const supabase = createClient();
 
     useEffect(() => {
@@ -47,8 +53,8 @@ export default function PaymentsDashboardPage() {
                     *,
                     orders (
                         order_number,
-                        rfqs ( rfq_number ),
-                        profiles ( name, company_name )
+                        rfqs:rfq_id ( rfq_number ),
+                        profiles:buyer_id ( name, company_name )
                     )
                 `)
                 .order("created_at", { ascending: false });
@@ -188,7 +194,10 @@ export default function PaymentsDashboardPage() {
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button className="text-blue-600 hover:text-blue-800 font-medium text-sm">
+                                        <button
+                                            onClick={() => setSelectedPayment(pay)}
+                                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                                        >
                                             Manage
                                         </button>
                                     </td>
@@ -197,6 +206,241 @@ export default function PaymentsDashboardPage() {
                         </tbody>
                     </table>
                 )}
+            </div>
+
+            {/* Manage Payment Modal */}
+            {selectedPayment && (
+                <ManagePaymentModal
+                    payment={selectedPayment}
+                    onClose={() => setSelectedPayment(null)}
+                    onSuccess={() => {
+                        setSelectedPayment(null);
+                        fetchPayments();
+                    }}
+                />
+            )}
+        </div>
+    );
+}
+
+function ManagePaymentModal({ payment, onClose, onSuccess }: { payment: PaymentRecord, onClose: () => void, onSuccess: () => void }) {
+    const [loading, setLoading] = useState(false);
+    const supabase = createClient();
+
+    // Form State
+    const [advPercent, setAdvPercent] = useState(payment.advance_percentage);
+
+    // Advance Status
+    const [advStatus, setAdvStatus] = useState(payment.advance_status);
+    const [advDate, setAdvDate] = useState(payment.advance_paid_date || "");
+    const [advFile, setAdvFile] = useState<File | null>(null);
+    const [showAdvUpload, setShowAdvUpload] = useState(!payment.advance_doc_url);
+
+    // Balance Status
+    const [balStatus, setBalStatus] = useState(payment.balance_status);
+    const [balDate, setBalDate] = useState(payment.balance_paid_date || "");
+    const [balFile, setBalFile] = useState<File | null>(null);
+    const [showBalUpload, setShowBalUpload] = useState(!payment.balance_doc_url);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            let advDocUrl = payment.advance_doc_url;
+            let balDocUrl = payment.balance_doc_url;
+
+            // 1. Upload Files if new ones selected
+            if (advFile) {
+                const path = `payments/${payment.id}/advance_${Date.now()}_${advFile.name}`;
+                const { error } = await supabase.storage.from('rfq-drawings').upload(path, advFile);
+                if (error) throw error;
+                const { data } = supabase.storage.from('rfq-drawings').getPublicUrl(path);
+                advDocUrl = data.publicUrl;
+            }
+
+            if (balFile) {
+                const path = `payments/${payment.id}/balance_${Date.now()}_${balFile.name}`;
+                const { error } = await supabase.storage.from('rfq-drawings').upload(path, balFile);
+                if (error) throw error;
+                const { data } = supabase.storage.from('rfq-drawings').getPublicUrl(path);
+                balDocUrl = data.publicUrl;
+            }
+
+            // 2. Update Database
+            const { error } = await supabase
+                .from("order_payments")
+                .update({
+                    advance_percentage: advPercent,
+                    advance_status: advStatus,
+                    advance_paid_date: advDate || null,
+                    advance_doc_url: advDocUrl,
+
+                    balance_status: balStatus,
+                    balance_paid_date: balDate || null,
+                    balance_doc_url: balDocUrl,
+
+                    updated_at: new Date().toISOString()
+                })
+                .eq("id", payment.id);
+
+            if (error) throw error;
+
+            alert("Payment Updated Successfully!");
+            onSuccess();
+
+        } catch (error: any) {
+            console.error("Update Error:", error);
+            alert("Failed to update payment: " + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white z-10">
+                    <h2 className="text-xl font-bold text-gray-900">Manage Payment</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-500">
+                        <X className="h-6 w-6" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-8">
+
+                    {/* 1. Advance Configuration */}
+                    <div className="bg-orange-50 p-6 rounded-xl border border-orange-100 space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold text-orange-900 flex items-center gap-2">
+                                <span className="bg-orange-200 text-orange-800 px-2 py-1 rounded text-xs">1</span>
+                                Advance Payment
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm font-medium text-orange-800">Split %:</label>
+                                <input
+                                    type="number"
+                                    value={advPercent}
+                                    onChange={(e) => setAdvPercent(Number(e.target.value))}
+                                    className="w-16 px-2 py-1 border border-orange-300 rounded text-center font-bold"
+                                    min="0" max="100"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Status</label>
+                                <select
+                                    value={advStatus}
+                                    onChange={(e) => setAdvStatus(e.target.value)}
+                                    className="w-full p-2 border border-orange-200 rounded-lg bg-white"
+                                >
+                                    <option value="Pending">Pending</option>
+                                    <option value="Overdue">Overdue</option>
+                                    <option value="Paid">Paid</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Payment Date</label>
+                                <input
+                                    type="date"
+                                    value={advDate}
+                                    onChange={(e) => setAdvDate(e.target.value)}
+                                    className="w-full p-2 border border-orange-200 rounded-lg"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Proof (UTR / Advice)</label>
+                            {!showAdvUpload && payment.advance_doc_url ? (
+                                <div className="flex items-center justify-between bg-white p-2 border border-orange-200 rounded-lg">
+                                    <a href={payment.advance_doc_url} target="_blank" className="text-blue-600 hover:underline text-sm truncate">View Uploaded File</a>
+                                    <button type="button" onClick={() => setShowAdvUpload(true)} className="text-xs text-red-500 hover:underline">Replace</button>
+                                </div>
+                            ) : (
+                                <input
+                                    type="file"
+                                    onChange={(e) => setAdvFile(e.target.files?.[0] || null)}
+                                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-100 file:text-orange-700 hover:file:bg-orange-200"
+                                />
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 2. Balance Configuration */}
+                    <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold text-blue-900 flex items-center gap-2">
+                                <span className="bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs">2</span>
+                                Balance Payment
+                            </h3>
+                            <div className="text-sm font-medium text-blue-800">
+                                Remaining: <span className="font-bold">{100 - advPercent}%</span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Status</label>
+                                <select
+                                    value={balStatus}
+                                    onChange={(e) => setBalStatus(e.target.value)}
+                                    className="w-full p-2 border border-blue-200 rounded-lg bg-white"
+                                >
+                                    <option value="Pending">Pending</option>
+                                    <option value="Overdue">Overdue</option>
+                                    <option value="Paid">Paid</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Payment Date</label>
+                                <input
+                                    type="date"
+                                    value={balDate}
+                                    onChange={(e) => setBalDate(e.target.value)}
+                                    className="w-full p-2 border border-blue-200 rounded-lg"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">Proof (UTR / Advice)</label>
+                            {!showBalUpload && payment.balance_doc_url ? (
+                                <div className="flex items-center justify-between bg-white p-2 border border-blue-200 rounded-lg">
+                                    <a href={payment.balance_doc_url} target="_blank" className="text-blue-600 hover:underline text-sm truncate">View Uploaded File</a>
+                                    <button type="button" onClick={() => setShowBalUpload(true)} className="text-xs text-red-500 hover:underline">Replace</button>
+                                </div>
+                            ) : (
+                                <input
+                                    type="file"
+                                    onChange={(e) => setBalFile(e.target.files?.[0] || null)}
+                                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
+                                />
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="pt-4 border-t flex justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-lg disabled:opacity-50 flex items-center gap-2"
+                        >
+                            <Save className="h-4 w-4" />
+                            {loading ? "Saving..." : "Save Changes"}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );

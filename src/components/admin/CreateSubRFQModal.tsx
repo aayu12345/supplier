@@ -205,7 +205,7 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                         </div>
 
                         {/* SECTION 4: TARGET PRICE & LEAD TIME */}
-                        <div className="px-6 py-4 bg-blue-50/50 border-y border-blue-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="px-6 py-4 bg-blue-50/50 border-y border-blue-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div className="flex items-center gap-4">
                                 <label className="text-sm font-bold text-gray-900 whitespace-nowrap">Target Price:</label>
                                 <div className="relative max-w-[200px]">
@@ -230,6 +230,17 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
                                         defaultValue={itemData?.lead_time_admin}
                                         required
                                         className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <label className="text-sm font-bold text-gray-900 whitespace-nowrap">Expiry:</label>
+                                <div className="relative w-full">
+                                    <input
+                                        name="quoteExpiryDate"
+                                        type="date"
+                                        className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        title="Quote Expiry Date"
                                     />
                                 </div>
                             </div>

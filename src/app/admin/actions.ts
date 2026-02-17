@@ -83,6 +83,7 @@ export async function createSubRFQ(formData: FormData) {
         // Pricing & Lead Time
         const targetPrice = formData.get("targetPrice") as string;
         const leadTime = formData.get("leadTime") as string;
+        const quoteExpiryDate = formData.get("quoteExpiryDate") as string; // NEW
 
         // Production Details
         const productionRemarks = formData.get("productionRemarks") as string;
@@ -158,6 +159,7 @@ export async function createSubRFQ(formData: FormData) {
 
                 // Form Fields
                 lead_time_admin: leadTime || null,
+                quote_expiry_date: quoteExpiryDate ? new Date(quoteExpiryDate).toISOString() : null, // NEW
 
                 // File
                 file_url: fileUrl,
