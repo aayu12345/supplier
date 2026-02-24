@@ -22,6 +22,7 @@ export type RFQ = {
     quote_price?: number;
     quote_lead_time?: string;
     quote_valid_until?: string;
+    file_url?: string;
 };
 
 const TABS = ["All RFQs", "Pending", "Quoted", "Rejected", "Negotiation"];
@@ -149,10 +150,38 @@ export default function QuotesTable() {
                                     <tr key={rfq.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-gray-900">{rfq.rfq_number}</td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <FileText className="h-4 w-4 text-gray-400" />
-                                                <span className="text-gray-700 truncate max-w-[150px]">{rfq.file_name}</span>
-                                            </div>
+                                            {rfq.file_url ? (
+                                                <div className="flex items-center gap-2 group relative">
+                                                    <FileText className="h-4 w-4 text-gray-400 group-hover:text-blue-500 transition-colors shrink-0" />
+                                                    <a
+                                                        href={rfq.file_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-gray-700 hover:text-blue-600 truncate max-w-[150px] transition-colors"
+                                                        title="Click to preview drawing"
+                                                    >
+                                                        {rfq.file_name}
+                                                    </a>
+                                                    {/* Eye icon only appears on hover for cleaner UI */}
+                                                    <a
+                                                        href={rfq.file_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        title="Preview"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 hover:text-blue-700 shrink-0">
+                                                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                                                            <circle cx="12" cy="12" r="3" />
+                                                        </svg>
+                                                    </a>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <FileText className="h-4 w-4 text-gray-400 shrink-0" />
+                                                    <span className="text-gray-700 truncate max-w-[150px]">{rfq.file_name || 'No Drawing'}</span>
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-gray-600">{rfq.quantity || '—'}</td>
                                         <td className="px-6 py-4 text-gray-600">
