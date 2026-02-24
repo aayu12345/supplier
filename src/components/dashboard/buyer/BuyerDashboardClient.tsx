@@ -28,9 +28,9 @@ export default function BuyerDashboardClient({ userName, isLoggedIn, shouldOpenM
                     <DashboardNav />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="flex flex-col gap-8">
                     {/* Main Content Area */}
-                    <div className="lg:col-span-2">
+                    <div className="w-full">
                         <div className="mb-6">
                             <h2 className="text-xl font-bold text-gray-900">Your Quotes</h2>
                         </div>
@@ -38,8 +38,8 @@ export default function BuyerDashboardClient({ userName, isLoggedIn, shouldOpenM
                         <QuotesTable key={`${userName}-${isLoggedIn}`} />
                     </div>
 
-                    {/* Sidebar */}
-                    <div className="lg:col-span-1">
+                    {/* Recent Activity (Horizontal) */}
+                    <div className="w-full">
                         <RecentActivity />
                     </div>
                 </div>

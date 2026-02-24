@@ -26,8 +26,7 @@ export default function RecentActivity() {
                 .from("rfqs")
                 .select("id, rfq_number, status, created_at, updated_at")
                 .eq("user_id", user.id)
-                .order("updated_at", { ascending: false })
-                .limit(5);
+                .order("updated_at", { ascending: false });
 
             if (data) {
                 setActivities(data);
@@ -84,20 +83,23 @@ export default function RecentActivity() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-6">Recent Activity</h3>
 
-            <div className="space-y-8 relative">
-                {/* Vertical connecting line */}
-                <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-gray-100"></div>
-
-                {activities.map((activity) => {
+            <div className="flex flex-row overflow-x-auto pb-4 gap-6 scrollbar-hide">
+                {activities.map((activity, index) => {
                     const config = getActivityConfig(activity.status);
+                    const isLast = index === activities.length - 1;
                     return (
-                        <div key={activity.id} className="relative flex gap-4">
-                            <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center ${config.bg} ${config.color} shrink-0`}>
+                        <div key={activity.id} className="relative flex flex-col items-start gap-3 min-w-[200px] flex-1">
+                            {/* Horizontal connecting line */}
+                            {!isLast && (
+                                <div className="absolute top-4 left-8 right-[-1.5rem] h-[2px] bg-gray-100 z-0"></div>
+                            )}
+
+                            <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center ${config.bg} ${config.color} shrink-0 ring-4 ring-white`}>
                                 <config.icon className="h-4 w-4" />
                             </div>
 
                             <div>
-                                <p className="text-sm text-gray-800 font-medium leading-relaxed">
+                                <p className="text-sm text-gray-800 font-medium leading-snug line-clamp-2">
                                     {config.text} {activity.rfq_number}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-1">
