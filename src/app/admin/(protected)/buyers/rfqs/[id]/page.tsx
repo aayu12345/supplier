@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Download, Save, CheckCircle, CheckCircle2, AlertCircle, ShoppingCart, MessageSquare, Send } from "lucide-react";
+import { ArrowLeft, Download, Save, CheckCircle, CheckCircle2, AlertCircle, ShoppingCart, MessageSquare, Send, FileText } from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import CreateSubRFQModal from "@/components/admin/CreateSubRFQModal";
@@ -15,10 +15,12 @@ type AdminRFQDetail = {
     rfq_number: string;
     file_name: string;
     file_url?: string;
+    attachments?: { name: string; url: string }[];
     quantity?: string;
     lead_time?: string; // Original buyer lead time
     target_price?: number; // Buyer's target
     description?: string; // Notes
+    notes?: string; // Buyer's global notes
     created_at: string;
     user_id: string; // FK to profiles
     admin_status: string; // 'New' | 'Live' | 'Quoted' | 'Sent to Buyer' | 'Approved' | 'Rejected'
@@ -165,6 +167,7 @@ export default function AdminRFQDetailPage() {
                         target_price: rfqData.target_price,
                         file_url: rfqData.file_url,
                         file_name: rfqData.file_name,
+                        attachments: (rfqData as any).attachments,
                         lead_time: rfqData.lead_time
                     });
                 }
@@ -503,6 +506,27 @@ export default function AdminRFQDetailPage() {
                 <h1 className="text-2xl font-bold mb-2">Parent RFQ: {rfq.rfq_number}</h1>
                 <p className="text-gray-500 mb-8">Uploaded by {rfq.profiles.name} • {rfq.admin_status}</p>
 
+                {/* Buyer Request Global Details */}
+                {(rfq.notes || rfq.lead_time) && (
+                    <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
+                        <h2 className="text-lg font-bold mb-4">Buyer Request Details</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            {rfq.lead_time && (
+                                <div>
+                                    <p className="text-gray-500 font-semibold mb-1">Requested Lead Time</p>
+                                    <p className="font-medium text-gray-900">{rfq.lead_time}</p>
+                                </div>
+                            )}
+                            {rfq.notes && (
+                                <div className="md:col-span-2">
+                                    <p className="text-gray-500 font-semibold mb-1">Notes / Instructions</p>
+                                    <p className="text-gray-900 bg-gray-50 p-3 rounded border border-gray-100 whitespace-pre-wrap">{rfq.notes}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Section A: Items from Buyer */}
                 <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
                     <h2 className="text-lg font-bold mb-4">Buyer Uploaded Items</h2>
@@ -513,6 +537,7 @@ export default function AdminRFQDetailPage() {
                                     <th className="px-4 py-3">Drawing</th>
                                     <th className="px-4 py-3">Qty</th>
                                     <th className="px-4 py-3">Target</th>
+                                    <th className="px-4 py-3">Lead Time</th>
                                     <th className="px-4 py-3 text-right">Action</th>
                                 </tr>
                             </thead>
@@ -524,10 +549,23 @@ export default function AdminRFQDetailPage() {
                                         <tr key={item.id} className="hover:bg-gray-50">
                                             <td className="px-4 py-3 font-medium">
                                                 {item.drawing_number}
-                                                {item.file_url && <a href={item.file_url} target="_blank" className="ml-2 text-blue-600 text-xs hover:underline">View</a>}
+                                                <div className="flex flex-col gap-1 mt-1">
+                                                    {item.attachments && item.attachments.length > 0 ? (
+                                                        item.attachments.map((f: any, i: number) => (
+                                                            <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline flex items-center gap-1">
+                                                                <FileText className="h-3 w-3" /> {f.name}
+                                                            </a>
+                                                        ))
+                                                    ) : item.file_url && (
+                                                        <a href={item.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs hover:underline flex items-center gap-1">
+                                                            <FileText className="h-3 w-3" /> View Drawing
+                                                        </a>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3">{item.quantity}</td>
                                             <td className="px-4 py-3">₹{item.target_price || '-'}</td>
+                                            <td className="px-4 py-3 text-gray-600">{item.lead_time || '-'}</td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex gap-2 justify-end">
                                                     <button
@@ -662,7 +700,24 @@ export default function AdminRFQDetailPage() {
                         </h3>
                         <div className="space-y-3 text-sm">
                             {/* Basic Info */}
-                            <p><span className="text-gray-500">File:</span> {rfq.file_name}</p>
+                            <div>
+                                <span className="text-gray-500 font-semibold mb-1 block">Uploaded Drawing(s):</span>
+                                {rfq.attachments && rfq.attachments.length > 0 ? (
+                                    <div className="flex flex-col gap-2 pl-2">
+                                        {rfq.attachments.map((f, i) => (
+                                            <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-2 bg-gray-50 p-2 rounded border border-gray-100">
+                                                <FileText className="h-4 w-4" /> {f.name}
+                                            </a>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="pl-2">
+                                        <a href={rfq.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-2 bg-gray-50 p-2 rounded border border-gray-100">
+                                            <FileText className="h-4 w-4" /> {rfq.file_name || 'View Drawing'}
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
                             {(rfq as any).part_name && <p><span className="text-gray-500 font-semibold">Part Name:</span> <span className="font-medium text-gray-900">{(rfq as any).part_name}</span></p>}
 
                             {/* Specifications */}

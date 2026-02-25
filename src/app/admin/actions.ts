@@ -64,7 +64,7 @@ export async function createSubRFQ(formData: FormData) {
 
         // Basic Form Fields
         const notes = formData.get("notes") as string;
-        const drawingFile = formData.get("drawing") as File | null;
+        const drawingFiles = formData.getAll("drawing") as File[];
         const rfqType = formData.get("rfqType") as string || 'single';
         const mode = formData.get("mode") as string || 'draft'; // 'draft' or 'live'
 
@@ -94,9 +94,11 @@ export async function createSubRFQ(formData: FormData) {
         const demandFreqValues = formData.getAll("demandFreq") as string[];
         const demandFrequency = demandFreqValues.length > 0 ? demandFreqValues : null;
 
-        // Validate file size (25MB max)
-        if (drawingFile && drawingFile.size > 25 * 1024 * 1024) {
-            return { error: "File size exceeds 25MB limit" };
+        // Validate file size (25MB max per file)
+        for (const f of drawingFiles) {
+            if (f.size > 25 * 1024 * 1024) {
+                return { error: `File ${f.name} size exceeds 25MB limit` };
+            }
         }
 
         // 1. Generate Sub-RFQ Number
@@ -116,24 +118,40 @@ export async function createSubRFQ(formData: FormData) {
         // 2. Handle File Upload (Start with existing if provided)
         let fileUrl = formData.get("existingFileUrl") as string | null;
         let fileName = formData.get("existingFileName") as string | null;
+        let attachments: { name: string; url: string }[] = [];
 
-        if (drawingFile && drawingFile.size > 0) {
+        const existingAttachmentsStr = formData.get("existingAttachments") as string | null;
+        if (existingAttachmentsStr) {
             try {
-                const fileExt = drawingFile.name.split('.').pop();
-                fileName = drawingFile.name;
-                const filePath = `rfq-drawings/${subRfqNumber}-${Date.now()}.${fileExt}`;
+                attachments = JSON.parse(existingAttachmentsStr);
+            } catch (e) {
+                console.error("Failed to parse existing attachments", e);
+            }
+        }
 
-                const { error: uploadError } = await supabase.storage
-                    .from("rfq-drawings")
-                    .upload(filePath, drawingFile);
+        if (drawingFiles && drawingFiles.length > 0 && drawingFiles[0].size > 0) {
+            try {
+                const uploadPromises = drawingFiles.map(async (file) => {
+                    const fileExt = file.name.split('.').pop();
+                    const genFileName = `${subRfqNumber}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                    const filePath = `rfq-drawings/${genFileName}`;
 
-                if (uploadError) {
-                    console.error("Upload error:", uploadError);
-                    return { error: `File upload failed: ${uploadError.message}` };
-                }
+                    const { error: uploadError } = await supabase.storage
+                        .from("rfq-drawings")
+                        .upload(filePath, file);
 
-                const { data: { publicUrl } } = supabase.storage.from("rfq-drawings").getPublicUrl(filePath);
-                fileUrl = publicUrl;
+                    if (uploadError) {
+                        throw new Error(`File upload failed: ${uploadError.message}`);
+                    }
+
+                    const { data: { publicUrl } } = supabase.storage.from("rfq-drawings").getPublicUrl(filePath);
+                    return { name: file.name, url: publicUrl, generatedName: genFileName };
+                });
+
+                const uploadedFiles = await Promise.all(uploadPromises);
+                attachments = uploadedFiles.map(f => ({ name: f.name, url: f.url }));
+                fileUrl = uploadedFiles.length > 0 ? uploadedFiles[0].url : null;
+                fileName = uploadedFiles.length > 0 ? uploadedFiles[0].generatedName : null;
             } catch (uploadErr: any) {
                 console.error("File upload exception:", uploadErr);
                 return { error: "File upload failed. Please try again." };
@@ -164,6 +182,7 @@ export async function createSubRFQ(formData: FormData) {
                 // File
                 file_url: fileUrl,
                 file_name: fileName,
+                attachments: attachments, // New attachments field
 
                 // Specifications
                 material_size: materialSize || null,

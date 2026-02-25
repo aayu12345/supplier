@@ -23,6 +23,7 @@ export type RFQ = {
     quote_lead_time?: string;
     quote_valid_until?: string;
     file_url?: string;
+    attachments?: { name: string; url: string }[];
 };
 
 const TABS = ["All RFQs", "Pending", "Quoted", "Rejected", "Negotiation"];
@@ -52,6 +53,7 @@ export default function QuotesTable() {
                 .from("rfqs")
                 .select("*")
                 .eq("user_id", user.id)
+                .neq("status", "Draft") // Exclude Draft RFQs
                 .order("created_at", { ascending: false });
 
             if (error) throw error;

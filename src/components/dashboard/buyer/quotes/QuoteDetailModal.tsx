@@ -66,9 +66,25 @@ export default function QuoteDetailModal({ isOpen, onClose, quote }: QuoteDetail
                     <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
                         <h3 className="text-sm font-bold text-gray-900 mb-4 uppercase tracking-wide">RFQ Details</h3>
 
-                        <div className="flex items-start gap-3 mb-4">
-                            <FileText className="h-5 w-5 text-blue-600 mt-0.5" />
-                            <span className="text-blue-600 font-medium hover:underline cursor-pointer">{quote.file_name}</span>
+                        <div className="flex flex-col gap-2 mb-4 bg-white p-3 rounded-lg border border-gray-100">
+                            {quote.attachments && quote.attachments.length > 0 ? (
+                                quote.attachments.map((file, i) => (
+                                    <div key={i} className="flex items-center gap-3">
+                                        <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-medium hover:underline flex-1 text-sm truncate">{file.name}</a>
+                                    </div>
+                                ))
+                            ) : quote.file_url ? (
+                                <div className="flex items-center gap-3">
+                                    <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                                    <a href={quote.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-medium hover:underline flex-1 text-sm truncate">{quote.file_name}</a>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3">
+                                    <FileText className="h-4 w-4 text-gray-400 shrink-0" />
+                                    <span className="text-gray-500 font-medium text-sm">No drawing provided</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 text-sm">

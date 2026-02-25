@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Upload, X, Calendar, FileText, AlertCircle, Save } from "lucide-react";
 import { createSubRFQ } from "@/app/admin/actions";
+import FileUploadZone from "@/components/ui/FileUploadZone";
 
 type CreateSubRFQModalProps = {
     isOpen: boolean;
@@ -16,7 +17,7 @@ type CreateSubRFQModalProps = {
 
 export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfqNumber, userId, itemData, mode = 'draft' }: CreateSubRFQModalProps) {
     const [loading, setLoading] = useState(false);
-    const [file, setFile] = useState<File | null>(null);
+    const [files, setFiles] = useState<File[]>([]);
 
     const subRfqPlaceholder = `${parentRfqNumber}-XX`;
 
@@ -33,11 +34,14 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
         formData.append("rfqType", 'single');
         formData.append("mode", mode); // Pass draft or live mode
 
-        // If a new file is selected, it will be in formData as 'drawing'
-        // If not, and we want to keep the old one, we might need to handle that in backend
-        // But for now, let's assume if no new file, backend keeps the existing one or we pass the url
-        if (file) {
-            formData.append("drawing", file);
+        if (files.length > 0) {
+            files.forEach(f => formData.append("drawing", f));
+        } else if (itemData?.attachments && itemData.attachments.length > 0) {
+            formData.append("existingAttachments", JSON.stringify(itemData.attachments));
+            if (itemData?.file_url) {
+                formData.append("existingFileUrl", itemData.file_url);
+                formData.append("existingFileName", itemData.file_name);
+            }
         } else if (itemData?.file_url) {
             formData.append("existingFileUrl", itemData.file_url);
             formData.append("existingFileName", itemData.file_name);
@@ -99,42 +103,32 @@ export default function CreateSubRFQModal({ isOpen, onClose, parentId, parentRfq
 
                             <div className="flex flex-col md:flex-row gap-4">
                                 {/* Upload Box */}
-                                <div className="flex-1">
-                                    <div className="border-2 border-dashed border-blue-200 rounded-lg bg-blue-50/30 hover:bg-blue-50 hover:border-blue-400 transition-all cursor-pointer relative group h-full min-h-[120px] flex flex-col items-center justify-center text-center p-4">
-                                        <input
-                                            type="file"
-                                            name="drawing"
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                            onChange={(e) => setFile(e.target.files?.[0] || null)}
-                                        />
-                                        {file ? (
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-green-100 p-2 rounded-full text-green-600">
-                                                    <FileText className="h-5 w-5" />
-                                                </div>
-                                                <div className="text-left">
-                                                    <p className="font-bold text-gray-900 text-sm">{file.name}</p>
-                                                    <p className="text-xs text-green-600 font-medium">Ready to upload</p>
-                                                </div>
+                                <div className="flex-1 min-w-[280px]">
+                                    <FileUploadZone onFilesSelect={setFiles} selectedFiles={files} allowMultiple={true} />
+                                    {(!files || files.length === 0) && itemData?.attachments && itemData.attachments.length > 0 && (
+                                        <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                            <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Existing Drawings</p>
+                                            <div className="flex flex-col gap-2">
+                                                {itemData.attachments.map((att: any, idx: number) => (
+                                                    <div key={idx} className="flex items-center gap-2">
+                                                        <FileText className="h-4 w-4 text-blue-500 shrink-0" />
+                                                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline flex-1 truncate">{att.name}</a>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ) : itemData?.file_url ? (
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                                                    <FileText className="h-5 w-5" />
-                                                </div>
-                                                <div className="text-left">
-                                                    <p className="font-bold text-gray-900 text-sm">{itemData.file_name || "Existing Drawing"}</p>
-                                                    <p className="text-xs text-blue-600 font-medium"><a href={itemData.file_url} target="_blank" rel="noopener noreferrer" className="underline z-20 relative">View Current</a>  • Click to Change</p>
-                                                </div>
+                                            <p className="text-[10px] text-gray-400 mt-2 italic">Uploading new files will replace these.</p>
+                                        </div>
+                                    )}
+                                    {(!files || files.length === 0) && (!itemData?.attachments || itemData.attachments.length === 0) && itemData?.file_url && (
+                                        <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                            <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Existing Drawing</p>
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="h-4 w-4 text-blue-500 shrink-0" />
+                                                <a href={itemData.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline flex-1 truncate">{itemData.file_name || 'View Drawing'}</a>
                                             </div>
-                                        ) : (
-                                            <>
-                                                <Upload className="h-7 w-7 text-blue-400 mb-2 group-hover:scale-110 transition-transform" />
-                                                <p className="text-sm font-medium text-blue-900">Upload File</p>
-                                                <p className="text-xs text-blue-400 mt-1">PDF, STEP, DWG</p>
-                                            </>
-                                        )}
-                                    </div>
+                                            <p className="text-[10px] text-gray-400 mt-2 italic">Uploading new files will replace this.</p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Critical Notes */}

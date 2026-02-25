@@ -13,7 +13,7 @@ interface RFQUploadModalProps {
 
 export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: RFQUploadModalProps) {
     const [rfqType, setRfqType] = useState<"single" | "multiple">("single");
-    const [file, setFile] = useState<File | null>(null);
+    const [files, setFiles] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const router = useRouter();
 
@@ -49,8 +49,8 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!file) {
-            alert("Please upload a drawing file.");
+        if (files.length === 0) {
+            alert("Please upload at least one drawing file.");
             return;
         }
 
@@ -68,8 +68,8 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
             const form = e.target as HTMLFormElement;
             const data = new FormData(form);
 
-            if (file) {
-                data.set("file", file);
+            if (files.length > 0) {
+                files.forEach(f => data.append("files", f));
             }
             data.set("type", rfqType);
 
@@ -129,14 +129,14 @@ export default function RFQUploadModal({ isOpen, onClose, isLoggedIn = true }: R
                     <section>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-                                1. Upload Drawing <span className="text-red-500">*</span>
+                                1. Upload Drawing(s) <span className="text-red-500">*</span>
                             </h3>
                         </div>
-                        <FileUploadZone onFileSelect={setFile} selectedFile={file} />
+                        <FileUploadZone onFilesSelect={setFiles} selectedFiles={files} allowMultiple={true} />
                         <p className="text-xs text-gray-500 mt-2">
                             {rfqType === "multiple"
-                                ? "Upload the main drawing containing all items."
-                                : "Upload the drawing file for this part."}
+                                ? "Upload the main drawing containing all items or multiple specific drawings."
+                                : "Upload one or more drawing files for this part."}
                         </p>
                     </section>
 

@@ -8,17 +8,18 @@ export async function submitRFQ(formData: FormData) {
     console.time("submitRFQ_Total");
     try {
         // 1. Preparation & Metadata (Sync)
-        const file = formData.get("file") as File;
+        const files = formData.getAll("files") as File[];
         const type = formData.get("type") as string;
 
         // Validation: Main file required for ALL types now
-        if (!file) return { error: "No file uploaded." };
-        if (file && file.size > 50 * 1024 * 1024) return { error: "File size exceeds 50MB limit." };
+        if (!files || files.length === 0) return { error: "No files uploaded." };
+        if (files.some(f => f.size > 50 * 1024 * 1024)) return { error: "One or more files exceed the 50MB limit." };
 
         const rfqNumber = `RFQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-        let publicUrl = null;
-        let fileName = null;
+        let publicUrl: string | null = null;
+        let fileName: string | null = null;
+        let attachments: { name: string; url: string }[] = [];
 
         // Optimization: Use Year/Month based folders to allow parallel processing independent of user ID
         const filePathBase = `${new Date().getFullYear()}`;
@@ -32,26 +33,21 @@ export async function submitRFQ(formData: FormData) {
 
         // 2. Start Parallel Operations (Upload & Auth)
 
-        // Task A: Upload File (Only if exists)
-        let uploadPromise: Promise<string | null> = Promise.resolve(null);
-        if (file) {
+        // Task A: Upload Files
+        const uploadPromises = files.map(file => {
             const fileExt = file.name.split(".").pop();
-            fileName = `${rfqNumber}_${Date.now()}.${fileExt}`;
-            const filePath = `${filePathBase}/${fileName}`;
+            const genFileName = `${rfqNumber}_${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
+            const filePath = `${filePathBase}/${genFileName}`;
 
-            // @ts-ignore
-            const { data: buckets } = await supabaseAdmin.storage.listBuckets();
-            console.log("AVAILABLE BUCKETS:", buckets?.map(b => b.name));
-
-            uploadPromise = supabaseAdmin.storage
+            return supabaseAdmin.storage
                 .from("rfq-drawings")
                 .upload(filePath, file)
                 .then(result => {
                     if (result.error) throw new Error("Upload failed: " + result.error.message);
                     const { data: { publicUrl } } = supabaseAdmin.storage.from("rfq-drawings").getPublicUrl(filePath);
-                    return publicUrl;
+                    return { name: file.name, url: publicUrl, generatedName: genFileName };
                 });
-        }
+        });
 
         // Task B: Get or Create User
         const userPromise = (async () => {
@@ -96,8 +92,11 @@ export async function submitRFQ(formData: FormData) {
         })();
 
         // 3. Await Parallel Tasks
-        const [urlResult, userData] = await Promise.all([uploadPromise, userPromise]);
-        publicUrl = urlResult;
+        const [uploadedFiles, userData] = await Promise.all([Promise.all(uploadPromises), userPromise]);
+
+        attachments = uploadedFiles.map(f => ({ name: f.name, url: f.url }));
+        publicUrl = uploadedFiles.length > 0 ? uploadedFiles[0].url : null;
+        fileName = uploadedFiles.length > 0 ? uploadedFiles[0].generatedName : null;
 
         console.timeEnd("Parallel_Tasks");
 
@@ -106,8 +105,9 @@ export async function submitRFQ(formData: FormData) {
             user_id: userData.userId,
             rfq_number: rfqNumber,
             status: "Pending",
-            file_url: publicUrl, // Can be null now
-            file_name: fileName || (type === "multiple" ? "Multiple Items" : "No File"), // Placeholder or null
+            file_url: publicUrl, // Backward compatibility (first file)
+            file_name: fileName || (type === "multiple" ? "Multiple Items" : "No File"), // Backward compatibility
+            attachments: attachments, // New JSONB column
             type: type,
             quantity: formData.get("quantity") || null,
             lead_time: formData.get("lead_time") || null,

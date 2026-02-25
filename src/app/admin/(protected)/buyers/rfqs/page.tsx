@@ -10,6 +10,7 @@ type AdminRFQ = {
     id: string;
     rfq_number: string;
     file_name: string;
+    attachments?: { name: string; url: string }[];
     created_at: string;
     admin_status: 'New' | 'Live' | 'Quoted' | 'Sent to Buyer' | 'Negotiation' | 'Approved' | 'Rejected';
     profiles: {
@@ -84,6 +85,7 @@ export default function AdminRFQsPage() {
                     id,
                     rfq_number,
                     file_name,
+                    attachments,
                     created_at,
                     admin_status,
                     visibility_expires_at,
@@ -209,7 +211,11 @@ export default function AdminRFQsPage() {
                                             </div>
                                             <div>
                                                 <p className="font-semibold text-gray-900">{rfq.rfq_number}</p>
-                                                <p className="text-sm text-gray-500 truncate max-w-[200px]">{rfq.file_name}</p>
+                                                <p className="text-sm text-gray-500 truncate max-w-[200px]">
+                                                    {rfq.attachments && rfq.attachments.length > 0
+                                                        ? `${rfq.attachments.length} file(s) attached`
+                                                        : rfq.file_name || 'No file'}
+                                                </p>
                                             </div>
                                         </div>
                                     </td>
