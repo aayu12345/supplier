@@ -4,6 +4,7 @@ import { Bell, Search, Upload, LogOut, LogIn, User, Settings, ChevronDown } from
 import { signOut } from "@/app/dashboard/buyer/actions";
 import Link from "next/link";
 import { useState } from "react";
+import BuyerNotificationsDropdown from "./BuyerNotificationsDropdown";
 
 interface DashboardHeaderProps {
     userName: string;
@@ -35,10 +36,7 @@ export default function DashboardHeader({ userName, onUploadClick, isLoggedIn = 
 
                 <div className="flex items-center gap-2">
                     {/* Notifications */}
-                    <button className="p-2.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors relative">
-                        <Bell className="h-6 w-6" />
-                        <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-                    </button>
+                    <BuyerNotificationsDropdown />
 
                     {/* Profile Dropdown */}
                     {isLoggedIn ? (

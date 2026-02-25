@@ -210,8 +210,15 @@ export default function AdminRFQsPage() {
                                                 <FileText className="h-5 w-5" />
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-gray-900">{rfq.rfq_number}</p>
-                                                <p className="text-sm text-gray-500 truncate max-w-[200px]">
+                                                <div className="flex items-center gap-2">
+                                                    <p className={rfq.admin_status === 'New' ? 'font-extrabold text-gray-900' : 'font-medium text-gray-700'}>
+                                                        {rfq.rfq_number}
+                                                    </p>
+                                                    {rfq.admin_status === 'New' && (
+                                                        <span className="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Action Required</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-gray-500 truncate max-w-[200px] mt-0.5">
                                                     {rfq.attachments && rfq.attachments.length > 0
                                                         ? `${rfq.attachments.length} file(s) attached`
                                                         : rfq.file_name || 'No file'}

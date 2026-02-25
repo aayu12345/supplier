@@ -108,7 +108,27 @@ export async function submitQuote(prevState: any, formData: FormData) {
         console.log("✅ RFQ status successfully updated to 'Quoted'");
     }
 
+    // --- CREATE NOTIFICATION FOR BUYER ---
+    try {
+        const { data: rfqInfo } = await adminSupabase
+            .from('rfqs')
+            .select('user_id, rfq_number')
+            .eq('id', rfqId)
+            .single();
 
+        if (rfqInfo && rfqInfo.user_id) {
+            await adminSupabase.from('notifications').insert({
+                user_id: rfqInfo.user_id,
+                title: 'New Quote Received',
+                message: `Supplier ${supplierName} submitted a new quote for RFQ ${rfqInfo.rfq_number}.`,
+                type: 'success',
+                is_read: false
+            });
+            console.log(`✅ Notification sent to buyer (${rfqInfo.user_id})`);
+        }
+    } catch (notifErr) {
+        console.error("Failed to send notification:", notifErr);
+    }
     // Log Activity
     const { logActivity } = await import("@/lib/actions/timeline");
     await logActivity(

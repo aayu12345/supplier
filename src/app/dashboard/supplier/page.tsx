@@ -96,7 +96,8 @@ function ActionTile({ icon: Icon, label, href, colorClass }: { icon: any, label:
 
 // 3. RFQ Card (Clean Row Style)
 function RFQCard({ rfq }: { rfq: any }) {
-    const leadTimeDisplay = rfq.lead_time ? new Date(rfq.lead_time).toLocaleDateString() : 'N/A';
+    const effectiveLeadTime = rfq.lead_time_admin || rfq.lead_time;
+    const leadTimeDisplay = effectiveLeadTime ? new Date(effectiveLeadTime).toLocaleDateString() : 'N/A';
 
     return (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-blue-300 transition-colors">
